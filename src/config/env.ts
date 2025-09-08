@@ -1,6 +1,7 @@
 import { cleanEnv, str, num, bool } from 'envalid';
 import dotenv from 'dotenv';
 import * as path from 'node:path';
+import { logger } from './logger';
 
 const envPath = path.resolve(process.cwd(), '.env');
 dotenv.config({ path: envPath });
@@ -22,3 +23,10 @@ export const ENV = cleanEnv(process.env, {
 	PUSH_JSON_OBJECT: bool({ default: true }),
 	PUSH_JSON_KEYS: bool({ default: true }),
 });
+
+// log environment variables to console
+if (ENV.isDev) {
+	for (const key of Object.keys(ENV)) {
+		logger.scope('ENV').debug(`${key} = ${String((ENV as any)[key])}`);
+	}
+}

@@ -26,6 +26,7 @@ export class Wled extends TypedEmitter<WledEvents> {
 	}
 
 	public handleCommand(command: WledCommand) {
+		logger.scope('WLED').start(`Handling command "${command.cmd}"...`);
 		switch (command.cmd) {
 			case Command.SetState:
 				this.setState(command.state);
@@ -43,6 +44,8 @@ export class Wled extends TypedEmitter<WledEvents> {
 				this.getPalettes();
 				break;
 		}
+
+		logger.scope('WLED').success(`Command "${command.cmd}" executed.`);
 	}
 
 	private startPolling() {
@@ -85,9 +88,7 @@ export class Wled extends TypedEmitter<WledEvents> {
 
 	private async setState(state: any) {
 		try {
-			const res = await this.api.post('/json/state', state);
-			console.log(res.data);
-
+			await this.api.post('/json/state', state);
 			await this.getState();
 		} catch (err) {
 			logger.scope('WLED').error('Failed to set state:', err);
@@ -98,6 +99,7 @@ export class Wled extends TypedEmitter<WledEvents> {
 		try {
 			const res = await this.api.get<string[]>('/json/eff');
 			this.emit('effects', res.data);
+			logger.scope('WLED').debug(`Effects: ${JSON.stringify(res.data)}`);
 		} catch (err) {
 			logger.scope('WLED').error('Failed to fetch effects');
 		}
@@ -107,6 +109,7 @@ export class Wled extends TypedEmitter<WledEvents> {
 		try {
 			const res = await this.api.get<string[]>('/json/pal');
 			this.emit('palettes', res.data);
+			logger.scope('WLED').debug(`Palettes: ${JSON.stringify(res.data)}`);
 		} catch (err) {
 			logger.scope('WLED').error('Failed to fetch palettes');
 		}
@@ -115,14 +118,12 @@ export class Wled extends TypedEmitter<WledEvents> {
 	private async getState() {
 		const res = await this.api.get<object>('/json/state');
 		this.emit('state', res.data);
+		logger.scope('WLED').debug(`State: ${JSON.stringify(res.data)}`);
 	}
 
 	private async getInfo() {
-		try {
-			const res = await this.api.get<object>('/json/info');
-			this.emit('info', res.data);
-		} catch (err) {
-			logger.scope('WLED').error('Failed to fetch info');
-		}
+		const res = await this.api.get<object>('/json/info');
+		this.emit('info', res.data);
+		logger.scope('WLED').debug(`Info: ${JSON.stringify(res.data)}`);
 	}
 }

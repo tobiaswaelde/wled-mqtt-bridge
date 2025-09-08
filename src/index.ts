@@ -51,11 +51,12 @@ mqttClient.on('message', (topic, payload) => {
 	if (!msg || msg === '') return;
 	if (topic !== TOPICS.MQTT.CMD) return;
 
-	logger.scope('MQTT').log(`[RX] ${msg}`);
+	logger.scope('MQTT').log(`[RX] ${JSON.stringify(JSON.parse(msg))}`);
 
 	const cmd: WledCommand = JSON.parse(msg) satisfies WledCommand;
 	wled.handleCommand(cmd);
 
+	logger.scope('MQTT').info('Reset command');
 	mqttClient.publish(TOPICS.MQTT.CMD, '');
 });
 
