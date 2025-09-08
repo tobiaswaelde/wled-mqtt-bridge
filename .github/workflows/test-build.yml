@@ -1,0 +1,22 @@
+name: Test Docker Build
+
+on:
+  push:
+    branches: ['**']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          docker build --file Dockerfile --tag wled-mqtt-bridge .
+
+      - name: Verify image was built
+        run: docker images | grep wled-mqtt-bridge
