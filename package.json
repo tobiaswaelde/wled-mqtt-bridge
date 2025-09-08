@@ -1,7 +1,12 @@
 {
   "name": "wled-mqtt-bridge",
   "version": "0.0.1",
-  "description": "A bridge to control WLED over MQTT.",
+  "description": "A lightweight Node.js service that connects a WLED instance with MQTT.",
+  "keywords": [
+    "wled",
+    "mqtt",
+    "bridge"
+  ],
   "author": {
     "name": "Tobias Wälde",
     "email": "tobias.waelde@gmail.com",
@@ -14,7 +19,7 @@
     "prebuild": "rimraf build",
     "build": "tsc",
     "prebundle": "yarn build && rimraf ./dist",
-    "bundle": "ncc build build/index.js -o dist",
+    "bundle": "ncc build build/index.js -o dist -m --stats-out stats.json",
     "start": "node dist/index.js"
   },
   "devDependencies": {
@@ -28,7 +33,6 @@
     "typescript": "^5.9.2"
   },
   "dependencies": {
-    "axios": "^1.11.0",
     "dotenv": "^17.2.2",
     "envalid": "^8.1.0",
     "mqtt": "^5.14.1",

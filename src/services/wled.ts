@@ -1,25 +1,19 @@
-import axios, { AxiosInstance } from 'axios';
 import { TypedEmitter } from '../util/typed-emitter';
 import { ENV } from '../config/env';
 import { logger } from '../config/logger';
 import { Command, WledCommand } from '../types/wled-cmd';
 import { WledEvents } from '../types/wled-events';
+import { Http } from '../util/http';
 
 export class Wled extends TypedEmitter<WledEvents> {
-	private host: string;
-	private api: AxiosInstance;
+	private http: Http;
 	private pollTimer: NodeJS.Timeout | null = null;
 	private pollDelay: number = ENV.WLED_POLL_INTERVAL;
 	private firstFailAt: number | null = null; // timestamp of first failure
 
 	constructor(host: string) {
 		super();
-		this.host = host;
-
-		this.api = axios.create({
-			baseURL: this.host,
-			timeout: ENV.WLED_TIMEOUT,
-		});
+		this.http = new Http(host);
 
 		// start polling
 		this.startPolling();
@@ -88,7 +82,7 @@ export class Wled extends TypedEmitter<WledEvents> {
 
 	private async setState(state: any) {
 		try {
-			await this.api.post('/json/state', state);
+			await this.http.post('/json/state', state);
 			await this.getState();
 		} catch (err) {
 			logger.scope('WLED').error('Failed to set state:', err);
@@ -97,9 +91,9 @@ export class Wled extends TypedEmitter<WledEvents> {
 
 	private async getEffects() {
 		try {
-			const res = await this.api.get<string[]>('/json/eff');
-			this.emit('effects', res.data);
-			logger.scope('WLED').debug(`Effects: ${JSON.stringify(res.data)}`);
+			const effects = await this.http.get<string[]>('/json/eff');
+			this.emit('effects', effects);
+			logger.scope('WLED').debug(`Effects: ${JSON.stringify(effects)}`);
 		} catch (err) {
 			logger.scope('WLED').error('Failed to fetch effects');
 		}
@@ -107,23 +101,23 @@ export class Wled extends TypedEmitter<WledEvents> {
 
 	private async getPalettes() {
 		try {
-			const res = await this.api.get<string[]>('/json/pal');
-			this.emit('palettes', res.data);
-			logger.scope('WLED').debug(`Palettes: ${JSON.stringify(res.data)}`);
+			const palettes = await this.http.get<string[]>('/json/pal');
+			this.emit('palettes', palettes);
+			logger.scope('WLED').debug(`Palettes: ${JSON.stringify(palettes)}`);
 		} catch (err) {
 			logger.scope('WLED').error('Failed to fetch palettes');
 		}
 	}
 
 	private async getState() {
-		const res = await this.api.get<object>('/json/state');
-		this.emit('state', res.data);
-		logger.scope('WLED').debug(`State: ${JSON.stringify(res.data)}`);
+		const state = await this.http.get<object>('/json/state');
+		this.emit('state', state);
+		logger.scope('WLED').debug(`State: ${JSON.stringify(state)}`);
 	}
 
 	private async getInfo() {
-		const res = await this.api.get<object>('/json/info');
-		this.emit('info', res.data);
-		logger.scope('WLED').debug(`Info: ${JSON.stringify(res.data)}`);
+		const info = await this.http.get<object>('/json/info');
+		this.emit('info', info);
+		logger.scope('WLED').debug(`Info: ${JSON.stringify(info)}`);
 	}
 }
