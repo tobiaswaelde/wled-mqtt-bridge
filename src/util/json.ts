@@ -3,13 +3,13 @@
  * @param {Record<string, any>} obj The object to inspect
  * @param {string} separator The path separator (default: '.')
  * @param {string} parentKey The parent key (used for recursion)
- * @returns {Map<string, string>} A map of JSON paths to their values
+ * @returns {Map<string, any>} A map of JSON paths to their values
  */
 export function getJsonPaths(
 	obj: Record<string, any>,
 	separator: string = '.',
 	parentKey: string = ''
-): Map<string, string> {
+): Map<string, any> {
 	const paths: Map<string, string> = new Map();
 
 	for (const [key, value] of Object.entries(obj)) {
@@ -26,9 +26,9 @@ export function getJsonPaths(
 				paths.set(nestedKey, nestedValue);
 			}
 		}
-		// otherwise, stringify
+		// otherwise, just set the value
 		else {
-			paths.set(fullPath, String(value));
+			paths.set(fullPath, value);
 		}
 	}
 
