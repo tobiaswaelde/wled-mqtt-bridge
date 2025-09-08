@@ -44,6 +44,5 @@ export const ENV = cleanEnv(process.env, {
 if (ENV.isDev) {
 	for (const key of Object.keys(ENV)) {
 		logger.scope('ENV').debug(`${key} = ${String((ENV as any)[key])}`);
-		console.debug(`[ENV] ${key} = ${String((ENV as any)[key])}`);
 	}
 }

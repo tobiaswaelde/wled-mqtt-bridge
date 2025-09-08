@@ -36,7 +36,6 @@
     "dotenv": "^17.2.2",
     "envalid": "^8.1.0",
     "mqtt": "^5.14.1",
-    "reconnecting-websocket": "^4.4.0",
     "signale": "^1.4.0"
   }
 }
