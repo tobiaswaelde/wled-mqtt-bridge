@@ -1,0 +1,42 @@
+{
+  "name": "wled-mqtt-bridge",
+  "version": "0.0.1",
+  "description": "A bridge to control WLED over MQTT.",
+  "author": {
+    "name": "Tobias Wälde",
+    "email": "tobias.waelde@gmail.com",
+    "url": "https://tobiaswaelde.com"
+  },
+  "private": false,
+  "license": "MIT",
+  "scripts": {
+    "dev": "nodemon --config \"./nodemon.json\"",
+    "prebuild": "rimraf build",
+    "build": "tsc",
+    "prebundle": "yarn build && rimraf ./dist",
+    "bundle": "ncc build build/index.js -o dist",
+    "start": "node dist/index.js"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@types/signale": "^1.4.7",
+    "@types/websocket": "^1.0.10",
+    "@types/ws": "^8.18.1",
+    "@vercel/ncc": "^0.38.3",
+    "nodemon": "^3.1.10",
+    "rimraf": "^6.0.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "axios": "^1.11.0",
+    "dotenv": "^17.2.1",
+    "envalid": "^8.1.0",
+    "mqtt": "^5.14.0",
+    "reconnecting-websocket": "^4.4.0",
+    "signale": "^1.4.0",
+    "socket.io-client": "^4.8.1",
+    "websocket": "^1.0.35",
+    "ws": "^8.18.3"
+  }
+}
