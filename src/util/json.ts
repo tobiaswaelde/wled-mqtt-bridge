@@ -28,7 +28,7 @@ export function getJsonPaths(
 		}
 		// otherwise, just set the value
 		else {
-			paths.set(fullPath, value);
+			paths.set(fullPath, String(value));
 		}
 	}
 

@@ -28,7 +28,7 @@ wled.on('state', (state) => {
 	if (ENV.PUSH_JSON_OBJECT) {
 		const paths = getJsonPaths(state, '/');
 		for (const [path, value] of paths) {
-			mqttClient.publish(`${TOPICS.WLED.STATE}/${path}`, JSON.stringify(value));
+			mqttClient.publish(`${TOPICS.WLED.STATE}/${path}`, value);
 		}
 	}
 });
@@ -39,7 +39,7 @@ wled.on('info', (info) => {
 	if (ENV.PUSH_JSON_OBJECT) {
 		const paths = getJsonPaths(info, '/');
 		for (const [path, value] of paths) {
-			mqttClient.publish(`${TOPICS.WLED.INFO}/${path}`, JSON.stringify(value));
+			mqttClient.publish(`${TOPICS.WLED.INFO}/${path}`, value);
 		}
 	}
 });
