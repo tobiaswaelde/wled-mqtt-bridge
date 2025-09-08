@@ -17,6 +17,12 @@ export class Wled extends TypedEmitter<WledEvents> {
 
 		// start polling
 		this.startPolling();
+
+		// initially get effects & palettes
+		setTimeout(() => {
+			this.getEffects();
+			this.getPalettes();
+		}, 5000);
 	}
 
 	public handleCommand(command: WledCommand) {
