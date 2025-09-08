@@ -1,4 +1,6 @@
-# ---------- Build stage ----------
+### ####################
+### BUILDER
+### ####################
 FROM node:lts-alpine AS build
 
 # Install build tools (needed for some deps)
@@ -20,7 +22,9 @@ RUN yarn build
 RUN yarn bundle
 
 
-# ---------- Runtime stage ----------
+### ####################
+### RUNNER
+### ####################
 FROM node:lts-alpine AS runtime
 
 WORKDIR /app
