@@ -11,6 +11,7 @@ You can also send commands via MQTT to control WLED (set state, fetch info, etc.
 
 ## 📚 Table Of Contents <!-- omit in toc -->
 - [✨ Features](#-features)
+- [📊 Ressources](#-ressources)
 - [⚙️ Configuration](#️-configuration)
   - [🌍 Environment Variables](#-environment-variables)
 - [🚀 Deployment](#-deployment)
@@ -33,6 +34,19 @@ You can also send commands via MQTT to control WLED (set state, fetch info, etc.
 - 🎛️ Supports MQTT commands:
   - `set_state`, `get_state`, `get_info`, `get_effects`, `get_palettes`
 - 🐳 Ready-to-use **Docker image**
+
+
+## 📊 Ressources
+
+The footprint of the Docker container depends on how intensively you use it.  
+Values are approximate and can vary by environment.
+
+| Usage    | 🧠 RAM  | 🔄 Network (up/down) | 🖥️ CPU         | Description                            |
+| -------- | ------ | ------------------- | ------------- | -------------------------------------- |
+| 💤 Low    | ~30 MB | ~25 KB/h / ~55 KB/h | ~0 - 0.01 %   | WLED disconnected, 30s polling         |
+| ⚡ Normal | ~41 MB | ~8 MB/h / ~20 MB/h  | ~0.1 - 0.18 % | 1000 ms polling, commands on demand    |
+| 🔥 Heavy  | ~44 MB | ~12 MB/h / ~26 MB/h | ~0.1 - 0.25 % | 1000 ms polling, ~1 command per second |
+
 
 ## ⚙️ Configuration
 
@@ -220,6 +234,8 @@ Fetch WLED palatte names array and publish to `${TOPIC}/palettes`.
   "Default", "Random Cycle", "Primary Color", "Based on Primary", "Set Colors", "Based on Set", "Party", "Cloud", "Lava", "Ocean", "Forest", "Rainbow", "Rainbow Bands", "Sunset", "Rivendell", "Breeze", "Red & Blue", "Yellowout", "Analogous", "Splash", "Pastel", "Sunset 2", "Beech", "Vintage", "Departure", "Landscape", "Beach", "Sherbet", "Hult", "Hult 64", "Drywet", "Jul", "Grintage", "Rewhi", "Tertiary", "Fire", "Icefire", "Cyane", "Light Pink", "Autumn", "Magenta", "Magred", "Yelmag", "Yelblu", "Orange & Teal", "Tiamat", "April Night"
 ]
 ```
+
+
 
 ## 📦 Changelog
 
