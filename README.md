@@ -41,11 +41,11 @@ You can also send commands via MQTT to control WLED (set state, fetch info, etc.
 The footprint of the Docker container depends on how intensively you use it.  
 Values are approximate and can vary by environment.
 
-| Usage    | 🧠 RAM  | 🔄 Network (up/down) | 🖥️ CPU         | Description                            |
-| -------- | ------ | ------------------- | ------------- | -------------------------------------- |
-| 💤 Low    | ~30 MB | ~25 KB/h / ~55 KB/h | ~0 - 0.01 %   | WLED disconnected, 30s polling         |
-| ⚡ Normal | ~41 MB | ~8 MB/h / ~20 MB/h  | ~0.1 - 0.18 % | 1000 ms polling, commands on demand    |
-| 🔥 Heavy  | ~44 MB | ~12 MB/h / ~26 MB/h | ~0.1 - 0.25 % | 1000 ms polling, ~1 command per second |
+| Usage    | 🧠 RAM  | 🔄 Network (up/down)     | 🖥️ CPU         | Description                            |
+| -------- | ------ | ----------------------- | ------------- | -------------------------------------- |
+| 💤 Low    | ~30 MB | ~0.01 KB/s / ~0.02 KB/s | ~0 - 0.01 %   | WLED disconnected, 30s polling         |
+| ⚡ Normal | ~41 MB | ~2.27 KB/s / ~5.69 KB/s | ~0.1 - 0.18 % | 1000 ms polling, commands on demand    |
+| 🔥 Heavy  | ~44 MB | ~3.41 KB/s / ~7.39 KB/s | ~0.1 - 0.25 % | 1000 ms polling, ~1 command per second |
 
 
 ## ⚙️ Configuration
