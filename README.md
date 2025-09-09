@@ -11,7 +11,7 @@ You can also send commands via MQTT to control WLED (set state, fetch info, etc.
 
 ## 📚 Table Of Contents <!-- omit in toc -->
 - [✨ Features](#-features)
-- [📊 Ressources](#-ressources)
+- [📊 Resource Usage](#-resource-usage)
 - [⚙️ Configuration](#️-configuration)
   - [🌍 Environment Variables](#-environment-variables)
 - [🚀 Deployment](#-deployment)
@@ -36,7 +36,7 @@ You can also send commands via MQTT to control WLED (set state, fetch info, etc.
 - 🐳 Ready-to-use **Docker image**
 
 
-## 📊 Ressources
+## 📊 Resource Usage
 
 The footprint of the Docker container depends on how intensively you use it.  
 Values are approximate and can vary by environment.
