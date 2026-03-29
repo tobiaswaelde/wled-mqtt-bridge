@@ -30,6 +30,13 @@ cargo clippy --all-targets --all-features -- -D warnings
 - `release.yml`: auto-release from `Cargo.toml` version
 - `deploy.yml`: Docker publish on pushed tags
 
+## Runtime additions
+
+- Dead-letter topic: `<base_topic>/<dead_letter_suffix>`
+- Optional metrics endpoint: `metrics.enabled` + `metrics.path`
+- Per-controller polling overrides via `wled.controllers[]`
+- QoS/retain tuning via `publish.qos.*` and `publish.retain.*`
+
 ## Notes for contributors
 
 - Keep MQTT topic contract stable unless explicitly changed

@@ -11,6 +11,11 @@ For controller `living-room`:
 - Effects list: `wled/living-room/effects`
 - Palettes list: `wled/living-room/palettes`
 
+Bridge-level:
+
+- Bridge online: `wled/bridge_online`
+- Dead-letter (default): `wled/dead_letter`
+
 ## Commands
 
 Payload on `wled/living-room/cmd`:

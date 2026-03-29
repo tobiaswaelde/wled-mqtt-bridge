@@ -19,6 +19,8 @@ Core behavior:
   - `/json/pal`
 - Publish data to controller-scoped MQTT topics.
 - Listen for JSON commands per controller and forward to WLED.
+- Publish dead-letter entries for invalid command topics/payloads.
+- Optionally expose Prometheus-style metrics.
 
 ## Repository Layout
 
@@ -33,6 +35,9 @@ Core behavior:
   - MQTT event loop
   - per-controller polling loops
   - command handling and topic routing
+- `src/metrics.rs`
+  - runtime counters
+  - optional metrics endpoint server
 - `config/config.example.yml`
   - checked-in template config
 - `docs/`
@@ -54,6 +59,7 @@ For `mqtt.base_topic = wled` and `controller_id = living-room`:
 Bridge-level availability topic:
 
 - `wled/bridge_online`
+- `wled/dead_letter` (default suffix configurable)
 
 Do not change topic paths or payload shape unless explicitly requested.
 
@@ -66,6 +72,15 @@ Required structure (no legacy `wled.host` fallback):
   - unique `id`
   - non-empty `id` and `host`
   - `id` must not contain `/`
+- Optional per-controller polling overrides:
+  - `interval_ms`
+  - `timeout_ms`
+  - `timeout_duration_ms`
+- Optional per-topic publish tuning:
+  - `publish.qos.*`
+  - `publish.retain.*`
+- Optional metrics endpoint:
+  - `metrics.enabled`, `metrics.host`, `metrics.port`, `metrics.path`
 
 If config schema changes:
 

@@ -35,6 +35,24 @@ The container runs an internal healthcheck using:
 wled-mqtt-bridge --config /app/config/config.yml --healthcheck
 ```
 
+## Metrics (optional)
+
+If enabled in config:
+
+```yaml
+metrics:
+  enabled: true
+  host: 0.0.0.0
+  port: 9090
+  path: /metrics
+```
+
+then metrics are exposed at:
+
+```text
+http://<host>:9090/metrics
+```
+
 ## Failure And Recovery Flow
 
 ```mermaid

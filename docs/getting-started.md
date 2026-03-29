@@ -24,6 +24,12 @@ Edit `config/config.yml` and set:
 docker compose up -d
 ```
 
+Optional: run a pinned image version
+
+```bash
+IMAGE_TAG=v1.0.2 docker compose up -d
+```
+
 ## 4. Verify it is running
 
 ```bash

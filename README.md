@@ -38,12 +38,19 @@ docker compose pull
 docker compose up -d
 ```
 
+Optional: pin an image version
+
+```bash
+IMAGE_TAG=v1.0.2 docker compose up -d
+```
+
 ## Configuration (for users)
 
 Main fields in `config/config.yml`:
 
 - `mqtt.host`, `mqtt.port`, `mqtt.username`, `mqtt.password`
 - `mqtt.base_topic`
+- `mqtt.dead_letter_suffix`
 - `wled.controllers[]` with `id` + `host`
 
 Example:
@@ -56,6 +63,7 @@ mqtt:
   username: mqtt-user
   password: mqtt-password
   base_topic: wled
+  dead_letter_suffix: dead_letter
 
 wled:
   controllers:
@@ -79,6 +87,28 @@ For controller `living-room`:
 Bridge availability:
 
 - `wled/bridge_online`
+
+Dead-letter (default):
+
+- `wled/dead_letter`
+
+## Optional Metrics
+
+Enable in config:
+
+```yaml
+metrics:
+  enabled: true
+  host: 0.0.0.0
+  port: 9090
+  path: /metrics
+```
+
+Then scrape:
+
+```text
+http://<host>:9090/metrics
+```
 
 ## Documentation
 

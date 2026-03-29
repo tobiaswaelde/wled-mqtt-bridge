@@ -31,3 +31,17 @@ ghcr.io/tobiaswaelde/wled-mqtt-bridge:latest
 ```
 
 For fixed rollouts, pin a version tag instead of `latest`.
+
+Example:
+
+```bash
+IMAGE_TAG=v1.0.2 docker compose up -d
+```
+
+## Runtime limits and logs
+
+`compose.yml` already includes:
+
+- container healthcheck
+- log rotation (`max-size`, `max-file`)
+- CPU and memory limits
