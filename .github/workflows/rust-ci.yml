@@ -110,7 +110,7 @@ jobs:
             --network wled-ci \
             -v /tmp/wled-ci-config.yml:/app/config/config.yml:ro \
             wled-mqtt-bridge:ci \
-            --config /app/config/config.yml --healthcheck
+            /app/wled-mqtt-bridge --config /app/config/config.yml --healthcheck
 
       - name: Cleanup test broker
         if: always()
