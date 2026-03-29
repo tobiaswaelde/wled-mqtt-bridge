@@ -1,6 +1,6 @@
 [package]
 name = "wled-mqtt-bridge"
-version = "1.0.3"
+version = "2.0.0"
 edition = "2021"
 description = "A lightweight Rust service that connects a WLED instance with MQTT."
 license = "MIT"

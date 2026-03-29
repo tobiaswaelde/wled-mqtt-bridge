@@ -4,7 +4,7 @@
 
 ## [Unreleased]
 
-## [1.0.3] - 2026-03-29
+## [2.0.0] - 2026-03-29
 ### Added
 - Docker Compose improvements (healthcheck override, log rotation, resource limits, image tag pinning support)
 - Optional Prometheus-style metrics endpoint
