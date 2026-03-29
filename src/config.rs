@@ -203,3 +203,77 @@ fn default_true() -> bool {
 fn default_log_level() -> String {
     "info".to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn valid_config() -> AppConfig {
+        AppConfig {
+            mqtt: MqttConfig {
+                protocol: "mqtt".to_string(),
+                host: "127.0.0.1".to_string(),
+                port: 1883,
+                client_id: "test-client".to_string(),
+                username: None,
+                password: None,
+                base_topic: "wled".to_string(),
+                keep_alive_secs: 30,
+                reconnect_delay_secs: 5,
+            },
+            wled: WledConfig {
+                controllers: vec![
+                    WledControllerConfig {
+                        id: "living-room".to_string(),
+                        host: "192.168.1.50".to_string(),
+                    },
+                    WledControllerConfig {
+                        id: "office".to_string(),
+                        host: "192.168.1.51".to_string(),
+                    },
+                ],
+            },
+            polling: PollingConfig::default(),
+            publish: PublishConfig::default(),
+            logging: LoggingConfig::default(),
+        }
+    }
+
+    #[test]
+    fn validate_accepts_valid_config() {
+        let cfg = valid_config();
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_empty_controllers() {
+        let mut cfg = valid_config();
+        cfg.wled.controllers.clear();
+        let err = cfg.validate().expect_err("expected validation error");
+        assert!(err.to_string().contains("wled.controllers"));
+    }
+
+    #[test]
+    fn validate_rejects_duplicate_controller_ids() {
+        let mut cfg = valid_config();
+        cfg.wled.controllers[1].id = "living-room".to_string();
+        let err = cfg.validate().expect_err("expected validation error");
+        assert!(err.to_string().contains("duplicate wled controller id"));
+    }
+
+    #[test]
+    fn validate_rejects_controller_id_with_slash() {
+        let mut cfg = valid_config();
+        cfg.wled.controllers[0].id = "bad/id".to_string();
+        let err = cfg.validate().expect_err("expected validation error");
+        assert!(err.to_string().contains("cannot contain '/'"));
+    }
+
+    #[test]
+    fn validate_rejects_empty_controller_host() {
+        let mut cfg = valid_config();
+        cfg.wled.controllers[0].host = " ".to_string();
+        let err = cfg.validate().expect_err("expected validation error");
+        assert!(err.to_string().contains("host cannot be empty"));
+    }
+}

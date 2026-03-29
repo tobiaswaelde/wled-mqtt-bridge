@@ -552,3 +552,44 @@ fn extract_controller_id(base_topic: &str, topic: &str) -> Option<String> {
 
     Some(controller_id.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+    use std::collections::HashMap;
+
+    #[test]
+    fn extract_controller_id_parses_valid_topic() {
+        let id = extract_controller_id("wled", "wled/living-room/cmd");
+        assert_eq!(id.as_deref(), Some("living-room"));
+    }
+
+    #[test]
+    fn extract_controller_id_rejects_non_cmd_topics() {
+        assert!(extract_controller_id("wled", "wled/living-room/state").is_none());
+        assert!(extract_controller_id("wled", "other/living-room/cmd").is_none());
+        assert!(extract_controller_id("wled", "wled/living/room/cmd").is_none());
+    }
+
+    #[test]
+    fn collect_paths_flattens_nested_values_and_arrays() {
+        let value = json!({
+            "on": true,
+            "bri": 128,
+            "seg": [{"id": 0, "fx": 5}],
+            "nested": {
+                "label": "desk"
+            }
+        });
+
+        let mut pairs = Vec::new();
+        collect_paths(&value, "", &mut pairs);
+        let map: HashMap<String, String> = pairs.into_iter().collect();
+
+        assert_eq!(map.get("on"), Some(&"true".to_string()));
+        assert_eq!(map.get("bri"), Some(&"128".to_string()));
+        assert_eq!(map.get("seg"), Some(&r#"[{"fx":5,"id":0}]"#.to_string()));
+        assert_eq!(map.get("nested/label"), Some(&"desk".to_string()));
+    }
+}
