@@ -7,5 +7,5 @@
 
 ## WLED offline
 
-- Ensure `wled.host` points to the device IP
+- Ensure each `wled.controllers[].host` points to the correct device IP
 - Verify `http://<wled-host>/json/state` is reachable

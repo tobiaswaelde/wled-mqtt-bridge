@@ -58,7 +58,7 @@ enum WledCommand {
 }
 
 pub async fn run(config: AppConfig) -> Result<()> {
-    let controllers = config.wled.controllers();
+    let controllers = config.wled.controllers.clone();
     let controller_map: HashMap<String, ControllerRuntime> = controllers
         .iter()
         .map(|controller| {

@@ -46,13 +46,13 @@ impl AppConfig {
             bail!("mqtt.base_topic cannot be empty");
         }
 
-        let controllers = self.wled.controllers();
+        let controllers = &self.wled.controllers;
         if controllers.is_empty() {
             bail!("wled.controllers must contain at least one controller");
         }
 
         let mut ids = HashSet::new();
-        for controller in &controllers {
+        for controller in controllers {
             if controller.id.trim().is_empty() {
                 bail!("wled controller id cannot be empty");
             }
@@ -97,27 +97,7 @@ pub struct MqttConfig {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct WledConfig {
-    #[serde(default)]
     pub controllers: Vec<WledControllerConfig>,
-    #[serde(default)]
-    pub host: Option<String>,
-}
-
-impl WledConfig {
-    pub fn controllers(&self) -> Vec<WledControllerConfig> {
-        if !self.controllers.is_empty() {
-            return self.controllers.clone();
-        }
-
-        if let Some(host) = &self.host {
-            return vec![WledControllerConfig {
-                id: "default".to_string(),
-                host: host.clone(),
-            }];
-        }
-
-        Vec::new()
-    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
