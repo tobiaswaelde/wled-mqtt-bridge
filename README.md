@@ -110,6 +110,12 @@ Then scrape:
 http://<host>:9090/metrics
 ```
 
+## Container Images
+
+- Multi-arch images are published for `linux/amd64` and `linux/arm64`
+- Images are signed with Cosign (keyless)
+- SPDX SBOM artifacts are generated during image publish
+
 ## Documentation
 
 Full docs are in `docs/` and published via GitHub Pages.
