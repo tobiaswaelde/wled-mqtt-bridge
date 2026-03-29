@@ -1,11 +1,33 @@
 # Deployment
 
-## Docker
+## Recommended: Docker Compose
+
+The repository includes `compose.yml` for standard operation.
+
+Start:
 
 ```bash
-docker build -t wled-mqtt-bridge .
+docker compose up -d
 ```
 
+Stop:
+
 ```bash
-docker run --rm -v $(pwd)/config:/app/config wled-mqtt-bridge
+docker compose down
 ```
+
+Restart:
+
+```bash
+docker compose restart wled-mqtt-bridge
+```
+
+## Image
+
+Default image:
+
+```text
+ghcr.io/tobiaswaelde/wled-mqtt-bridge:latest
+```
+
+For fixed rollouts, pin a version tag instead of `latest`.

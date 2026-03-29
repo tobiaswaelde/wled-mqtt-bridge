@@ -1,0 +1,7 @@
+services:
+  wled-mqtt-bridge:
+    container_name: wled-mqtt-bridge
+    image: ghcr.io/tobiaswaelde/wled-mqtt-bridge:latest
+    restart: unless-stopped
+    volumes:
+      - ./config:/app/config

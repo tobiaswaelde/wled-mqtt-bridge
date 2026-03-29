@@ -4,53 +4,57 @@
 ![Docker Deploy](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/deploy.yml/badge.svg)
 ![Version](https://img.shields.io/github/v/tag/tobiaswaelde/wled-mqtt-bridge?label=version)
 
-A lightweight Rust service that connects a [WLED](https://kno.wled.ge/) instance with MQTT.
+A lightweight Rust service that connects multiple [WLED](https://kno.wled.ge/) controllers with MQTT.
 
-## Features
-
-- Supports multiple WLED controllers in one bridge process
-- Polls each WLED controller for:
-  - `/json/state` -> `<base_topic>/<controller_id>/state`
-  - `/json/info` -> `<base_topic>/<controller_id>/info`
-  - `/json/eff` -> `<base_topic>/<controller_id>/effects`
-  - `/json/pal` -> `<base_topic>/<controller_id>/palettes`
-- Supports MQTT commands on `<base_topic>/<controller_id>/cmd`:
-  - `set_state`, `get_state`, `get_info`, `get_effects`, `get_palettes`
-- Adaptive polling:
-  - normal poll interval while healthy
-  - timeout interval after consecutive failures
-- Publishes online status to `<base_topic>/online`
-- Docker-ready runtime
-
-## Quick Start
+## Quick Start (Docker Compose)
 
 ```bash
+git clone https://github.com/tobiaswaelde/wled-mqtt-bridge.git
+cd wled-mqtt-bridge
 cp config/config.example.yml config/config.yml
 # edit config/config.yml
-cargo run -- --config config/config.yml
+
+docker compose up -d
 ```
 
-## Docker
+## Daily Use
+
+Status:
 
 ```bash
-docker build -t wled-mqtt-bridge .
+docker compose ps
 ```
+
+Logs:
 
 ```bash
-docker run --rm -v $(pwd)/config:/app/config wled-mqtt-bridge
+docker compose logs -f wled-mqtt-bridge
 ```
 
-## Configuration
+Update:
 
-Configuration is loaded from `config/config.yml` (YAML or JSON).
+```bash
+docker compose pull
+docker compose up -d
+```
 
-Example structure:
+## Configuration (for users)
+
+Main fields in `config/config.yml`:
+
+- `mqtt.host`, `mqtt.port`, `mqtt.username`, `mqtt.password`
+- `mqtt.base_topic`
+- `wled.controllers[]` with `id` + `host`
+
+Example:
 
 ```yaml
 mqtt:
   protocol: mqtt
-  host: 127.0.0.1
+  host: 192.168.1.10
   port: 1883
+  username: mqtt-user
+  password: mqtt-password
   base_topic: wled
 
 wled:
@@ -59,41 +63,45 @@ wled:
       host: 192.168.1.50
     - id: office
       host: 192.168.1.51
-
-polling:
-  interval_ms: 1000
-  timeout_ms: 30000
-  timeout_duration_ms: 30000
-
-publish:
-  json_object: true
-  json_keys: true
 ```
 
-## Commands
+## MQTT Topics
 
-Command payloads are JSON on `<base_topic>/<controller_id>/cmd`.
+For controller `living-room`:
 
-Get state:
+- `wled/living-room/cmd`
+- `wled/living-room/online`
+- `wled/living-room/state`
+- `wled/living-room/info`
+- `wled/living-room/effects`
+- `wled/living-room/palettes`
 
-```json
-{ "cmd": "get_state" }
-```
+Bridge availability:
 
-Set state:
+- `wled/bridge_online`
 
-```json
-{ "cmd": "set_state", "state": { "on": true } }
-```
+## Documentation
 
-## Docs
+Full docs are in `docs/` and published via GitHub Pages.
 
-A VitePress docs structure is available in `docs/`.
+- User docs start at [`docs/index.md`](docs/index.md)
+- Developer details are on [`docs/developer.md`](docs/developer.md)
+
+## For Developers (moved down intentionally)
+
+Local run:
 
 ```bash
-cd docs
-npm install
-npm run dev
+cargo run -- --config config/config.yml
+```
+
+Checks:
+
+```bash
+cargo fmt --all
+cargo check
+cargo test
+cargo clippy --all-targets --all-features -- -D warnings
 ```
 
 ## Changelog

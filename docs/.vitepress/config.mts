@@ -9,11 +9,11 @@ export default defineConfig({
       { text: 'Home', link: '/' },
       { text: 'Getting Started', link: '/getting-started' },
       { text: 'Configuration', link: '/configuration' },
-      { text: 'Deployment', link: '/deployment' }
+      { text: 'Operations', link: '/operations' }
     ],
     sidebar: [
       {
-        text: 'Guide',
+        text: 'User Guide',
         items: [
           { text: 'Overview', link: '/' },
           { text: 'Getting Started', link: '/getting-started' },
@@ -21,10 +21,16 @@ export default defineConfig({
           { text: 'Topic Contract', link: '/topic-contract' },
           { text: 'Operations', link: '/operations' },
           { text: 'Troubleshooting', link: '/troubleshooting' },
-          { text: 'Deployment', link: '/deployment' },
+          { text: 'Deployment', link: '/deployment' }
+        ]
+      },
+      {
+        text: 'Developer',
+        items: [
+          { text: 'Developer', link: '/developer' },
           { text: 'Architecture', link: '/architecture' },
-          { text: 'Recipes', link: '/recipes' },
-          { text: 'Concepts', link: '/concepts' }
+          { text: 'Concepts', link: '/concepts' },
+          { text: 'Recipes', link: '/recipes' }
         ]
       }
     ]
