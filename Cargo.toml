@@ -8,6 +8,7 @@ repository = "https://github.com/tobiaswaelde/wled-mqtt-bridge"
 
 [dependencies]
 anyhow = "1"
+axum = "0.8"
 clap = { version = "4", features = ["derive"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 rumqttc = "0.24"
@@ -18,3 +19,9 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "tim
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 uuid = { version = "1", features = ["v4"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"

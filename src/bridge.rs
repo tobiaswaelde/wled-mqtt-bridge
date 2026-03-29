@@ -4,11 +4,14 @@ use anyhow::{bail, Context, Result};
 use reqwest::Client;
 use rumqttc::{AsyncClient, Event, Incoming, LastWill, MqttOptions, Outgoing, QoS, Transport};
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{json, Value};
 use tokio::{sync::mpsc, time};
 use tracing::{debug, error, info, warn};
 
-use crate::config::AppConfig;
+use crate::{
+    config::{AppConfig, PollingConfig, PublishConfig},
+    metrics::BridgeMetrics,
+};
 
 #[derive(Debug, Clone)]
 struct Topics {
@@ -34,17 +37,39 @@ impl Topics {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+enum TopicClass {
+    State,
+    Info,
+    Effects,
+    Palettes,
+    Online,
+    BridgeOnline,
+    CmdReset,
+    DeadLetter,
+}
+
 #[derive(Debug, Clone)]
 struct ControllerRuntime {
     id: String,
     wled_base: String,
     topics: Arc<Topics>,
+    polling: PollingConfig,
 }
 
 #[derive(Debug, Clone)]
 struct CommandMessage {
     controller_id: String,
+    source_topic: String,
     payload: String,
+}
+
+#[derive(Debug, Clone)]
+struct DeadLetterMessage {
+    reason: String,
+    controller_id: Option<String>,
+    source_topic: Option<String>,
+    payload: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -57,7 +82,7 @@ enum WledCommand {
     GetPalettes,
 }
 
-pub async fn run(config: AppConfig) -> Result<()> {
+pub async fn run(config: AppConfig, metrics: Arc<BridgeMetrics>) -> Result<()> {
     let controllers = config.wled.controllers.clone();
     let controller_map: HashMap<String, ControllerRuntime> = controllers
         .iter()
@@ -69,6 +94,7 @@ pub async fn run(config: AppConfig) -> Result<()> {
                     &config.mqtt.base_topic,
                     &controller.id,
                 )),
+                polling: config.polling_for_controller(controller),
             };
             (controller.id.clone(), runtime)
         })
@@ -76,6 +102,11 @@ pub async fn run(config: AppConfig) -> Result<()> {
 
     let controller_map = Arc::new(controller_map);
     let http = Client::new();
+
+    let dead_letter_topic = format!(
+        "{}/{}",
+        config.mqtt.base_topic, config.mqtt.dead_letter_suffix
+    );
 
     let mut mqtt_options = MqttOptions::new(
         config.mqtt.client_id.clone(),
@@ -87,8 +118,8 @@ pub async fn run(config: AppConfig) -> Result<()> {
     mqtt_options.set_last_will(LastWill::new(
         format!("{}/bridge_online", config.mqtt.base_topic),
         "false",
-        QoS::AtLeastOnce,
-        true,
+        qos_from_u8(config.publish.qos.bridge_online),
+        config.publish.retain.bridge_online,
     ));
 
     if config.mqtt.protocol.eq_ignore_ascii_case("mqtts") {
@@ -105,10 +136,12 @@ pub async fn run(config: AppConfig) -> Result<()> {
         .await
         .context("failed to subscribe to command wildcard topic")?;
 
-    mqtt.publish(
+    publish_topic(
+        &mqtt,
+        &config.publish,
+        &metrics,
+        TopicClass::BridgeOnline,
         format!("{}/bridge_online", config.mqtt.base_topic),
-        QoS::AtLeastOnce,
-        true,
         "true",
     )
     .await
@@ -118,20 +151,25 @@ pub async fn run(config: AppConfig) -> Result<()> {
     let mqtt_for_events = mqtt.clone();
     let reconnect_delay = config.mqtt.reconnect_delay_secs;
     let base_topic = config.mqtt.base_topic.clone();
+    let publish_for_events = config.publish.clone();
+    let metrics_for_events = metrics.clone();
+    let dead_letter_for_events = dead_letter_topic.clone();
 
     tokio::spawn(async move {
         loop {
             match eventloop.poll().await {
                 Ok(Event::Incoming(Incoming::ConnAck(_))) => {
                     info!("mqtt connected");
-                    if let Err(err) = mqtt_for_events
-                        .publish(
-                            format!("{base_topic}/bridge_online"),
-                            QoS::AtLeastOnce,
-                            true,
-                            "true",
-                        )
-                        .await
+                    metrics_for_events.inc_mqtt_connack();
+                    if let Err(err) = publish_topic(
+                        &mqtt_for_events,
+                        &publish_for_events,
+                        &metrics_for_events,
+                        TopicClass::BridgeOnline,
+                        format!("{base_topic}/bridge_online"),
+                        "true",
+                    )
+                    .await
                     {
                         warn!(?err, "failed to publish bridge_online=true");
                     }
@@ -142,12 +180,30 @@ pub async fn run(config: AppConfig) -> Result<()> {
                         if !payload.trim().is_empty() {
                             let message = CommandMessage {
                                 controller_id,
+                                source_topic: packet.topic,
                                 payload,
                             };
                             if let Err(err) = cmd_tx.send(message).await {
                                 warn!(?err, "failed to enqueue command");
                             }
                         }
+                    } else if packet.topic.starts_with(&format!("{base_topic}/"))
+                        && packet.topic.ends_with("/cmd")
+                    {
+                        let payload = String::from_utf8_lossy(&packet.payload).to_string();
+                        let _ = publish_dead_letter(
+                            &mqtt_for_events,
+                            &publish_for_events,
+                            &metrics_for_events,
+                            &dead_letter_for_events,
+                            DeadLetterMessage {
+                                reason: "invalid_command_topic".to_string(),
+                                controller_id: None,
+                                source_topic: Some(packet.topic),
+                                payload: Some(payload),
+                            },
+                        )
+                        .await;
                     }
                 }
                 Ok(Event::Outgoing(Outgoing::Disconnect)) => {
@@ -155,6 +211,7 @@ pub async fn run(config: AppConfig) -> Result<()> {
                 }
                 Ok(_) => {}
                 Err(err) => {
+                    metrics_for_events.inc_mqtt_eventloop_error();
                     warn!(?err, "mqtt eventloop error");
                     time::sleep(std::time::Duration::from_secs(reconnect_delay.max(1))).await;
                 }
@@ -166,6 +223,8 @@ pub async fn run(config: AppConfig) -> Result<()> {
     let config_for_cmds = config.clone();
     let http_for_cmds = http.clone();
     let controllers_for_cmds = controller_map.clone();
+    let metrics_for_cmds = metrics.clone();
+    let dead_letter_for_cmds = dead_letter_topic.clone();
 
     tokio::spawn(async move {
         while let Some(cmd) = cmd_rx.recv().await {
@@ -181,21 +240,43 @@ pub async fn run(config: AppConfig) -> Result<()> {
                     &http_for_cmds,
                     controller,
                     &config_for_cmds,
+                    &metrics_for_cmds,
                     &cmd.payload,
                 )
                 .await;
 
                 if let Err(err) = result {
+                    metrics_for_cmds.inc_command_error();
                     error!(
                         controller_id = %controller.id,
                         ?err,
                         "failed to handle command"
                     );
+
+                    let _ = publish_dead_letter(
+                        &mqtt_for_cmds,
+                        &config_for_cmds.publish,
+                        &metrics_for_cmds,
+                        &dead_letter_for_cmds,
+                        DeadLetterMessage {
+                            reason: "command_handler_error".to_string(),
+                            controller_id: Some(controller.id.clone()),
+                            source_topic: Some(cmd.source_topic.clone()),
+                            payload: Some(cmd.payload.clone()),
+                        },
+                    )
+                    .await;
                 }
 
-                if let Err(err) = mqtt_for_cmds
-                    .publish(controller.topics.cmd.clone(), QoS::AtMostOnce, false, "")
-                    .await
+                if let Err(err) = publish_topic(
+                    &mqtt_for_cmds,
+                    &config_for_cmds.publish,
+                    &metrics_for_cmds,
+                    TopicClass::CmdReset,
+                    controller.topics.cmd.clone(),
+                    "",
+                )
+                .await
                 {
                     warn!(
                         controller_id = %controller.id,
@@ -205,6 +286,19 @@ pub async fn run(config: AppConfig) -> Result<()> {
                 }
             } else {
                 warn!(controller_id = %cmd.controller_id, "unknown controller id in command topic");
+                let _ = publish_dead_letter(
+                    &mqtt_for_cmds,
+                    &config_for_cmds.publish,
+                    &metrics_for_cmds,
+                    &dead_letter_for_cmds,
+                    DeadLetterMessage {
+                        reason: "unknown_controller_id".to_string(),
+                        controller_id: Some(cmd.controller_id.clone()),
+                        source_topic: Some(cmd.source_topic.clone()),
+                        payload: Some(cmd.payload.clone()),
+                    },
+                )
+                .await;
             }
         }
     });
@@ -217,15 +311,23 @@ pub async fn run(config: AppConfig) -> Result<()> {
                 &config.mqtt.base_topic,
                 &controller.id,
             )),
+            polling: config.polling_for_controller(&controller),
         };
 
         let mqtt_for_poll = mqtt.clone();
         let config_for_poll = config.clone();
         let http_for_poll = http.clone();
+        let metrics_for_poll = metrics.clone();
 
         tokio::spawn(async move {
-            run_controller_poll_loop(mqtt_for_poll, http_for_poll, controller, config_for_poll)
-                .await;
+            run_controller_poll_loop(
+                mqtt_for_poll,
+                http_for_poll,
+                controller,
+                config_for_poll,
+                metrics_for_poll,
+            )
+            .await;
         });
     }
 
@@ -242,10 +344,11 @@ async fn run_controller_poll_loop(
     http: Client,
     controller: ControllerRuntime,
     config: AppConfig,
+    metrics: Arc<BridgeMetrics>,
 ) {
     time::sleep(std::time::Duration::from_secs(5)).await;
 
-    if let Err(err) = publish_effects(&mqtt, &http, &controller, &config).await {
+    if let Err(err) = publish_effects(&mqtt, &http, &controller, &config, &metrics).await {
         warn!(
             controller_id = %controller.id,
             ?err,
@@ -253,7 +356,7 @@ async fn run_controller_poll_loop(
         );
     }
 
-    if let Err(err) = publish_palettes(&mqtt, &http, &controller, &config).await {
+    if let Err(err) = publish_palettes(&mqtt, &http, &controller, &config, &metrics).await {
         warn!(
             controller_id = %controller.id,
             ?err,
@@ -265,19 +368,19 @@ async fn run_controller_poll_loop(
 
     loop {
         let delay_ms = if let Some(failed_at) = first_fail_at {
-            if failed_at.elapsed().as_millis() >= u128::from(config.polling.timeout_ms) {
-                config.polling.timeout_duration_ms
+            if failed_at.elapsed().as_millis() >= u128::from(controller.polling.timeout_ms) {
+                controller.polling.timeout_duration_ms
             } else {
-                config.polling.interval_ms
+                controller.polling.interval_ms
             }
         } else {
-            config.polling.interval_ms
+            controller.polling.interval_ms
         };
 
         time::sleep(std::time::Duration::from_millis(delay_ms)).await;
 
-        let state_result = publish_state(&mqtt, &http, &controller, &config).await;
-        let info_result = publish_info(&mqtt, &http, &controller, &config).await;
+        let state_result = publish_state(&mqtt, &http, &controller, &config, &metrics).await;
+        let info_result = publish_info(&mqtt, &http, &controller, &config, &metrics).await;
 
         if state_result.is_ok() && info_result.is_ok() {
             if first_fail_at.is_some() {
@@ -285,14 +388,15 @@ async fn run_controller_poll_loop(
             }
             first_fail_at = None;
 
-            if let Err(err) = mqtt
-                .publish(
-                    controller.topics.online.clone(),
-                    QoS::AtLeastOnce,
-                    true,
-                    "true",
-                )
-                .await
+            if let Err(err) = publish_topic(
+                &mqtt,
+                &config.publish,
+                &metrics,
+                TopicClass::Online,
+                controller.topics.online.clone(),
+                "true",
+            )
+            .await
             {
                 warn!(
                     controller_id = %controller.id,
@@ -305,14 +409,15 @@ async fn run_controller_poll_loop(
                 first_fail_at = Some(time::Instant::now());
             }
 
-            if let Err(err) = mqtt
-                .publish(
-                    controller.topics.online.clone(),
-                    QoS::AtLeastOnce,
-                    true,
-                    "false",
-                )
-                .await
+            if let Err(err) = publish_topic(
+                &mqtt,
+                &config.publish,
+                &metrics,
+                TopicClass::Online,
+                controller.topics.online.clone(),
+                "false",
+            )
+            .await
             {
                 warn!(
                     controller_id = %controller.id,
@@ -322,9 +427,11 @@ async fn run_controller_poll_loop(
             }
 
             if let Err(err) = state_result {
+                metrics.inc_wled_poll_error();
                 warn!(controller_id = %controller.id, ?err, "poll state failed");
             }
             if let Err(err) = info_result {
+                metrics.inc_wled_poll_error();
                 warn!(controller_id = %controller.id, ?err, "poll info failed");
             }
         }
@@ -336,6 +443,7 @@ async fn handle_command(
     http: &Client,
     controller: &ControllerRuntime,
     config: &AppConfig,
+    metrics: &BridgeMetrics,
     payload: &str,
 ) -> Result<()> {
     let command: WledCommand = serde_json::from_str(payload).context("invalid command payload")?;
@@ -343,19 +451,19 @@ async fn handle_command(
     match command {
         WledCommand::SetState { state } => {
             post_json(http, &controller.wled_base, "/json/state", &state).await?;
-            publish_state(mqtt, http, controller, config).await?;
+            publish_state(mqtt, http, controller, config, metrics).await?;
         }
         WledCommand::GetState => {
-            publish_state(mqtt, http, controller, config).await?;
+            publish_state(mqtt, http, controller, config, metrics).await?;
         }
         WledCommand::GetInfo => {
-            publish_info(mqtt, http, controller, config).await?;
+            publish_info(mqtt, http, controller, config, metrics).await?;
         }
         WledCommand::GetEffects => {
-            publish_effects(mqtt, http, controller, config).await?;
+            publish_effects(mqtt, http, controller, config, metrics).await?;
         }
         WledCommand::GetPalettes => {
-            publish_palettes(mqtt, http, controller, config).await?;
+            publish_palettes(mqtt, http, controller, config, metrics).await?;
         }
     }
 
@@ -367,9 +475,18 @@ async fn publish_state(
     http: &Client,
     controller: &ControllerRuntime,
     config: &AppConfig,
+    metrics: &BridgeMetrics,
 ) -> Result<()> {
     let value = get_json(http, &controller.wled_base, "/json/state").await?;
-    publish_json_with_keys(mqtt, &controller.topics.state, &value, config).await
+    publish_json_with_keys(
+        mqtt,
+        &config.publish,
+        metrics,
+        &controller.topics.state,
+        TopicClass::State,
+        &value,
+    )
+    .await
 }
 
 async fn publish_info(
@@ -377,22 +494,34 @@ async fn publish_info(
     http: &Client,
     controller: &ControllerRuntime,
     config: &AppConfig,
+    metrics: &BridgeMetrics,
 ) -> Result<()> {
     let value = get_json(http, &controller.wled_base, "/json/info").await?;
-    publish_json_with_keys(mqtt, &controller.topics.info, &value, config).await
+    publish_json_with_keys(
+        mqtt,
+        &config.publish,
+        metrics,
+        &controller.topics.info,
+        TopicClass::Info,
+        &value,
+    )
+    .await
 }
 
 async fn publish_effects(
     mqtt: &AsyncClient,
     http: &Client,
     controller: &ControllerRuntime,
-    _config: &AppConfig,
+    config: &AppConfig,
+    metrics: &BridgeMetrics,
 ) -> Result<()> {
     let value = get_json(http, &controller.wled_base, "/json/eff").await?;
-    mqtt.publish(
+    publish_topic(
+        mqtt,
+        &config.publish,
+        metrics,
+        TopicClass::Effects,
         controller.topics.effects.clone(),
-        QoS::AtMostOnce,
-        false,
         serde_json::to_vec(&value)?,
     )
     .await
@@ -404,13 +533,16 @@ async fn publish_palettes(
     mqtt: &AsyncClient,
     http: &Client,
     controller: &ControllerRuntime,
-    _config: &AppConfig,
+    config: &AppConfig,
+    metrics: &BridgeMetrics,
 ) -> Result<()> {
     let value = get_json(http, &controller.wled_base, "/json/pal").await?;
-    mqtt.publish(
+    publish_topic(
+        mqtt,
+        &config.publish,
+        metrics,
+        TopicClass::Palettes,
         controller.topics.palettes.clone(),
-        QoS::AtMostOnce,
-        false,
         serde_json::to_vec(&value)?,
     )
     .await
@@ -425,33 +557,120 @@ async fn publish_palettes(
 
 async fn publish_json_with_keys(
     mqtt: &AsyncClient,
+    publish_config: &PublishConfig,
+    metrics: &BridgeMetrics,
     topic: &str,
+    class: TopicClass,
     value: &Value,
-    config: &AppConfig,
 ) -> Result<()> {
-    if config.publish.json_object {
-        mqtt.publish(
+    if publish_config.json_object {
+        publish_topic(
+            mqtt,
+            publish_config,
+            metrics,
+            class,
             topic.to_string(),
-            QoS::AtMostOnce,
-            false,
             serde_json::to_vec(value)?,
         )
         .await
         .with_context(|| format!("failed to publish {topic}"))?;
     }
 
-    if config.publish.json_keys {
+    if publish_config.json_keys {
         let mut paths = Vec::new();
         collect_paths(value, "", &mut paths);
 
         for (path, payload) in paths {
-            mqtt.publish(format!("{topic}/{path}"), QoS::AtMostOnce, false, payload)
-                .await
-                .with_context(|| format!("failed to publish {topic}/{path}"))?;
+            publish_topic(
+                mqtt,
+                publish_config,
+                metrics,
+                class,
+                format!("{topic}/{path}"),
+                payload,
+            )
+            .await
+            .with_context(|| format!("failed to publish {topic}/{path}"))?;
         }
     }
 
     Ok(())
+}
+
+async fn publish_dead_letter(
+    mqtt: &AsyncClient,
+    publish_config: &PublishConfig,
+    metrics: &BridgeMetrics,
+    dead_letter_topic: &str,
+    message: DeadLetterMessage,
+) -> Result<()> {
+    metrics.inc_dead_letter();
+    let body = json!({
+        "reason": message.reason,
+        "controller_id": message.controller_id,
+        "source_topic": message.source_topic,
+        "payload": message.payload,
+    });
+
+    publish_topic(
+        mqtt,
+        publish_config,
+        metrics,
+        TopicClass::DeadLetter,
+        dead_letter_topic.to_string(),
+        serde_json::to_vec(&body)?,
+    )
+    .await
+}
+
+async fn publish_topic(
+    mqtt: &AsyncClient,
+    publish_config: &PublishConfig,
+    metrics: &BridgeMetrics,
+    class: TopicClass,
+    topic: String,
+    payload: impl Into<Vec<u8>>,
+) -> Result<()> {
+    let (qos, retain) = qos_retain_for_class(publish_config, class);
+    mqtt.publish(topic, qos, retain, payload.into())
+        .await
+        .inspect_err(|_err| {
+            metrics.inc_mqtt_publish_error();
+        })
+        .context("mqtt publish failed")
+}
+
+fn qos_retain_for_class(publish_config: &PublishConfig, class: TopicClass) -> (QoS, bool) {
+    let (qos, retain) = match class {
+        TopicClass::State => (publish_config.qos.state, publish_config.retain.state),
+        TopicClass::Info => (publish_config.qos.info, publish_config.retain.info),
+        TopicClass::Effects => (publish_config.qos.effects, publish_config.retain.effects),
+        TopicClass::Palettes => (publish_config.qos.palettes, publish_config.retain.palettes),
+        TopicClass::Online => (publish_config.qos.online, publish_config.retain.online),
+        TopicClass::BridgeOnline => (
+            publish_config.qos.bridge_online,
+            publish_config.retain.bridge_online,
+        ),
+        TopicClass::CmdReset => (
+            publish_config.qos.cmd_reset,
+            publish_config.retain.cmd_reset,
+        ),
+        TopicClass::DeadLetter => (
+            publish_config.qos.dead_letter,
+            publish_config.retain.dead_letter,
+        ),
+    };
+
+    (qos_from_u8(qos), retain)
+}
+
+fn qos_from_u8(value: u8) -> QoS {
+    match value {
+        0 => QoS::AtMostOnce,
+        1 => QoS::AtLeastOnce,
+        2 => QoS::ExactlyOnce,
+        _ => QoS::AtMostOnce,
+    }
 }
 
 fn collect_paths(value: &Value, parent: &str, out: &mut Vec<(String, String)>) {
@@ -556,7 +775,6 @@ fn extract_controller_id(base_topic: &str, topic: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
     use std::collections::HashMap;
 
     #[test]
@@ -591,5 +809,13 @@ mod tests {
         assert_eq!(map.get("bri"), Some(&"128".to_string()));
         assert_eq!(map.get("seg"), Some(&r#"[{"fx":5,"id":0}]"#.to_string()));
         assert_eq!(map.get("nested/label"), Some(&"desk".to_string()));
+    }
+
+    #[test]
+    fn qos_from_u8_maps_values() {
+        assert!(matches!(qos_from_u8(0), QoS::AtMostOnce));
+        assert!(matches!(qos_from_u8(1), QoS::AtLeastOnce));
+        assert!(matches!(qos_from_u8(2), QoS::ExactlyOnce));
+        assert!(matches!(qos_from_u8(9), QoS::AtMostOnce));
     }
 }

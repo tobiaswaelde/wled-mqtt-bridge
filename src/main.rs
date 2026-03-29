@@ -3,7 +3,7 @@ use std::{fs, path::Path, path::PathBuf};
 use anyhow::{Context, Result};
 use clap::Parser;
 use tracing_subscriber::{fmt, EnvFilter};
-use wled_mqtt_bridge::{bridge, config::AppConfig};
+use wled_mqtt_bridge::{bridge, config::AppConfig, metrics::BridgeMetrics};
 
 const EXAMPLE_CONFIG: &str = include_str!("../config/config.example.yml");
 
@@ -30,8 +30,13 @@ async fn main() -> Result<()> {
     let config = AppConfig::load(&cli.config)?;
     config.validate()?;
     init_logging(&config)?;
+    let metrics = std::sync::Arc::new(BridgeMetrics::default());
+    metrics.set_active_controllers(config.wled.controllers.len() as u64);
 
-    bridge::run(config).await
+    let _metrics_server_handle =
+        wled_mqtt_bridge::metrics::spawn_metrics_server(&config.metrics, metrics.clone()).await?;
+
+    bridge::run(config, metrics).await
 }
 
 fn ensure_config_exists(path: &Path) -> Result<()> {

@@ -6,6 +6,7 @@ mqtt:
   username:
   password:
   base_topic: wled
+  dead_letter_suffix: dead_letter
   keep_alive_secs: 30
   reconnect_delay_secs: 5
 
@@ -14,6 +15,9 @@ wled:
     - id: living-room
       # Supports host/IP with or without scheme. Example: 192.168.1.50 or http://192.168.1.50
       host: 192.168.1.50
+      interval_ms: 1000
+      timeout_ms: 30000
+      timeout_duration_ms: 30000
     - id: office
       host: 192.168.1.51
 
@@ -25,6 +29,30 @@ polling:
 publish:
   json_object: true
   json_keys: true
+  qos:
+    state: 0
+    info: 0
+    effects: 0
+    palettes: 0
+    online: 1
+    bridge_online: 1
+    cmd_reset: 0
+    dead_letter: 0
+  retain:
+    state: false
+    info: false
+    effects: false
+    palettes: false
+    online: true
+    bridge_online: true
+    cmd_reset: false
+    dead_letter: false
+
+metrics:
+  enabled: false
+  host: 0.0.0.0
+  port: 9090
+  path: /metrics
 
 logging:
   level: info

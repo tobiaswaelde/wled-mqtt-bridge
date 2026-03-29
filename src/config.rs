@@ -12,6 +12,8 @@ pub struct AppConfig {
     #[serde(default)]
     pub publish: PublishConfig,
     #[serde(default)]
+    pub metrics: MetricsConfig,
+    #[serde(default)]
     pub logging: LoggingConfig,
 }
 
@@ -46,6 +48,14 @@ impl AppConfig {
             bail!("mqtt.base_topic cannot be empty");
         }
 
+        if self.mqtt.dead_letter_suffix.trim().is_empty() {
+            bail!("mqtt.dead_letter_suffix cannot be empty");
+        }
+
+        if self.metrics.path.trim().is_empty() || !self.metrics.path.starts_with('/') {
+            bail!("metrics.path must start with '/'");
+        }
+
         let controllers = &self.wled.controllers;
         if controllers.is_empty() {
             bail!("wled.controllers must contain at least one controller");
@@ -70,7 +80,19 @@ impl AppConfig {
             }
         }
 
+        self.publish.validate()?;
+
         Ok(())
+    }
+
+    pub fn polling_for_controller(&self, controller: &WledControllerConfig) -> PollingConfig {
+        PollingConfig {
+            interval_ms: controller.interval_ms.unwrap_or(self.polling.interval_ms),
+            timeout_ms: controller.timeout_ms.unwrap_or(self.polling.timeout_ms),
+            timeout_duration_ms: controller
+                .timeout_duration_ms
+                .unwrap_or(self.polling.timeout_duration_ms),
+        }
     }
 }
 
@@ -89,6 +111,8 @@ pub struct MqttConfig {
     pub password: Option<String>,
     #[serde(default = "default_base_topic")]
     pub base_topic: String,
+    #[serde(default = "default_dead_letter_suffix")]
+    pub dead_letter_suffix: String,
     #[serde(default = "default_keep_alive_secs")]
     pub keep_alive_secs: u64,
     #[serde(default = "default_reconnect_delay_secs")]
@@ -104,6 +128,12 @@ pub struct WledConfig {
 pub struct WledControllerConfig {
     pub id: String,
     pub host: String,
+    #[serde(default)]
+    pub interval_ms: Option<u64>,
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
+    #[serde(default)]
+    pub timeout_duration_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -132,6 +162,30 @@ pub struct PublishConfig {
     pub json_object: bool,
     #[serde(default = "default_true")]
     pub json_keys: bool,
+    #[serde(default)]
+    pub qos: QosConfig,
+    #[serde(default)]
+    pub retain: RetainConfig,
+}
+
+impl PublishConfig {
+    fn validate(&self) -> Result<()> {
+        for (name, value) in [
+            ("state", self.qos.state),
+            ("info", self.qos.info),
+            ("effects", self.qos.effects),
+            ("palettes", self.qos.palettes),
+            ("online", self.qos.online),
+            ("bridge_online", self.qos.bridge_online),
+            ("cmd_reset", self.qos.cmd_reset),
+            ("dead_letter", self.qos.dead_letter),
+        ] {
+            if value > 2 {
+                bail!("publish.qos.{name} must be 0, 1, or 2");
+            }
+        }
+        Ok(())
+    }
 }
 
 impl Default for PublishConfig {
@@ -139,6 +193,101 @@ impl Default for PublishConfig {
         Self {
             json_object: true,
             json_keys: true,
+            qos: QosConfig::default(),
+            retain: RetainConfig::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct QosConfig {
+    #[serde(default = "default_qos_0")]
+    pub state: u8,
+    #[serde(default = "default_qos_0")]
+    pub info: u8,
+    #[serde(default = "default_qos_0")]
+    pub effects: u8,
+    #[serde(default = "default_qos_0")]
+    pub palettes: u8,
+    #[serde(default = "default_qos_1")]
+    pub online: u8,
+    #[serde(default = "default_qos_1")]
+    pub bridge_online: u8,
+    #[serde(default = "default_qos_0")]
+    pub cmd_reset: u8,
+    #[serde(default = "default_qos_0")]
+    pub dead_letter: u8,
+}
+
+impl Default for QosConfig {
+    fn default() -> Self {
+        Self {
+            state: default_qos_0(),
+            info: default_qos_0(),
+            effects: default_qos_0(),
+            palettes: default_qos_0(),
+            online: default_qos_1(),
+            bridge_online: default_qos_1(),
+            cmd_reset: default_qos_0(),
+            dead_letter: default_qos_0(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RetainConfig {
+    #[serde(default)]
+    pub state: bool,
+    #[serde(default)]
+    pub info: bool,
+    #[serde(default)]
+    pub effects: bool,
+    #[serde(default)]
+    pub palettes: bool,
+    #[serde(default = "default_true")]
+    pub online: bool,
+    #[serde(default = "default_true")]
+    pub bridge_online: bool,
+    #[serde(default)]
+    pub cmd_reset: bool,
+    #[serde(default)]
+    pub dead_letter: bool,
+}
+
+impl Default for RetainConfig {
+    fn default() -> Self {
+        Self {
+            state: false,
+            info: false,
+            effects: false,
+            palettes: false,
+            online: true,
+            bridge_online: true,
+            cmd_reset: false,
+            dead_letter: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct MetricsConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default = "default_metrics_host")]
+    pub host: String,
+    #[serde(default = "default_metrics_port")]
+    pub port: u16,
+    #[serde(default = "default_metrics_path")]
+    pub path: String,
+}
+
+impl Default for MetricsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            host: default_metrics_host(),
+            port: default_metrics_port(),
+            path: default_metrics_path(),
         }
     }
 }
@@ -176,6 +325,10 @@ fn default_base_topic() -> String {
     "wled".to_string()
 }
 
+fn default_dead_letter_suffix() -> String {
+    "dead_letter".to_string()
+}
+
 fn default_keep_alive_secs() -> u64 {
     30
 }
@@ -200,6 +353,26 @@ fn default_true() -> bool {
     true
 }
 
+fn default_qos_0() -> u8 {
+    0
+}
+
+fn default_qos_1() -> u8 {
+    1
+}
+
+fn default_metrics_host() -> String {
+    "0.0.0.0".to_string()
+}
+
+fn default_metrics_port() -> u16 {
+    9090
+}
+
+fn default_metrics_path() -> String {
+    "/metrics".to_string()
+}
+
 fn default_log_level() -> String {
     "info".to_string()
 }
@@ -218,6 +391,7 @@ mod tests {
                 username: None,
                 password: None,
                 base_topic: "wled".to_string(),
+                dead_letter_suffix: "dead_letter".to_string(),
                 keep_alive_secs: 30,
                 reconnect_delay_secs: 5,
             },
@@ -226,15 +400,22 @@ mod tests {
                     WledControllerConfig {
                         id: "living-room".to_string(),
                         host: "192.168.1.50".to_string(),
+                        interval_ms: None,
+                        timeout_ms: None,
+                        timeout_duration_ms: None,
                     },
                     WledControllerConfig {
                         id: "office".to_string(),
                         host: "192.168.1.51".to_string(),
+                        interval_ms: None,
+                        timeout_ms: None,
+                        timeout_duration_ms: None,
                     },
                 ],
             },
             polling: PollingConfig::default(),
             publish: PublishConfig::default(),
+            metrics: MetricsConfig::default(),
             logging: LoggingConfig::default(),
         }
     }
@@ -275,5 +456,29 @@ mod tests {
         cfg.wled.controllers[0].host = " ".to_string();
         let err = cfg.validate().expect_err("expected validation error");
         assert!(err.to_string().contains("host cannot be empty"));
+    }
+
+    #[test]
+    fn validate_rejects_invalid_qos() {
+        let mut cfg = valid_config();
+        cfg.publish.qos.state = 3;
+        let err = cfg.validate().expect_err("expected validation error");
+        assert!(err.to_string().contains("publish.qos.state"));
+    }
+
+    #[test]
+    fn controller_polling_overrides_global_values() {
+        let mut cfg = valid_config();
+        cfg.polling.interval_ms = 1000;
+        cfg.polling.timeout_ms = 30000;
+        cfg.polling.timeout_duration_ms = 60000;
+
+        cfg.wled.controllers[0].interval_ms = Some(1500);
+        cfg.wled.controllers[0].timeout_ms = Some(45000);
+
+        let polling = cfg.polling_for_controller(&cfg.wled.controllers[0]);
+        assert_eq!(polling.interval_ms, 1500);
+        assert_eq!(polling.timeout_ms, 45000);
+        assert_eq!(polling.timeout_duration_ms, 60000);
     }
 }
