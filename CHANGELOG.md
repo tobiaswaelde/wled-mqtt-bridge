@@ -3,16 +3,23 @@
 <!-- Changelog created using the [Simple Changelog](https://marketplace.visualstudio.com/items?itemName=tobiaswaelde.vscode-simple-changelog) extension for VS Code. -->
 
 ## [Unreleased]
+
+## [1.0.3] - 2026-03-29
 ### Added
 - Docker Compose improvements (healthcheck override, log rotation, resource limits, image tag pinning support)
 - Optional Prometheus-style metrics endpoint
 - Dead-letter topic for invalid command and routing errors
 - Rust CI workflow (`fmt`, `clippy`, `check`, `test`)
+- Multi-architecture container image publishing (`linux/amd64`, `linux/arm64`)
+- Container SBOM generation and artifact upload
+- Cosign keyless image signing plus provenance/SBOM attestations
+- CI container smoke test using MQTT healthcheck
 
 ### Changed
 - Release workflow now skips when Cargo version is not higher than latest release tag and writes a summary
 - Per-controller polling overrides via `wled.controllers[]`
 - MQTT QoS/retain now configurable per topic class
+- Bridge module refactor: split orchestration and core helper logic
 
 ## [1.0.2] - 2025-09-09
 ### Added
