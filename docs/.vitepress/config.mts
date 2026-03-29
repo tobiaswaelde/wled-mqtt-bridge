@@ -3,6 +3,7 @@ import { defineConfig } from 'vitepress';
 export default defineConfig({
   title: 'WLED MQTT Bridge',
   description: 'Rust bridge between WLED and MQTT',
+  base: '/wled-mqtt-bridge/',
   themeConfig: {
     nav: [
       { text: 'Home', link: '/' },

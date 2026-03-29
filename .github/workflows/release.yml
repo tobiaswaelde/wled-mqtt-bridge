@@ -1,0 +1,118 @@
+name: Auto Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Derive version and tag
+        id: version
+        shell: bash
+        run: |
+          version="$(grep '^version' Cargo.toml | head -1 | cut -d '"' -f2)"
+          tag="v${version}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Check if release tag exists
+        id: tag_check
+        shell: bash
+        run: |
+          tag="${{ steps.version.outputs.tag }}"
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Stop if version already released
+        if: steps.tag_check.outputs.exists == 'true'
+        run: echo "Tag ${{ steps.version.outputs.tag }} already exists. Skipping release."
+
+      - name: Install Rust toolchain
+        if: steps.tag_check.outputs.exists != 'true'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        if: steps.tag_check.outputs.exists != 'true'
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release binary
+        if: steps.tag_check.outputs.exists != 'true'
+        run: cargo build --release
+
+      - name: Prepare release notes
+        if: steps.tag_check.outputs.exists != 'true'
+        shell: bash
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          notes_file="release-notes.md"
+
+          awk -v version="$version" '
+            $0 ~ "^## \\[" version "\\]" { capture = 1; next }
+            capture && $0 ~ "^## \\[" { exit }
+            capture { print }
+          ' CHANGELOG.md > "$notes_file"
+
+          if [ ! -s "$notes_file" ]; then
+            echo "Automated release for ${version}" > "$notes_file"
+            echo "" >> "$notes_file"
+            echo "No dedicated changelog section found in CHANGELOG.md." >> "$notes_file"
+          fi
+
+      - name: Package release artifacts
+        if: steps.tag_check.outputs.exists != 'true'
+        shell: bash
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          staging="dist/wled-mqtt-bridge-${version}"
+          archive="dist/wled-mqtt-bridge-${version}-linux-x86_64.tar.gz"
+
+          rm -rf dist
+          mkdir -p "$staging"
+          cp target/release/wled-mqtt-bridge "$staging/"
+          cp LICENSE.txt README.md "$staging/"
+
+          tar -C dist -czf "$archive" "wled-mqtt-bridge-${version}"
+          sha256sum "$archive" > "${archive}.sha256"
+
+      - name: Create and push tag
+        if: steps.tag_check.outputs.exists != 'true'
+        shell: bash
+        run: |
+          tag="${{ steps.version.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$tag"
+          git push origin "$tag"
+
+      - name: Create GitHub release
+        if: steps.tag_check.outputs.exists != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: WLED MQTT Bridge ${{ steps.version.outputs.tag }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          body_path: release-notes.md
+          files: |
+            dist/*.tar.gz
+            dist/*.sha256
