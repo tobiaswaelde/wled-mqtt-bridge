@@ -1,20 +1,38 @@
-# WLED MQTT Bridge
+---
+layout: home
+hero:
+  name: WLED MQTT Bridge
+  text: Reliable WLED ↔ MQTT integration
+  tagline: Poll multiple WLED controllers, publish structured MQTT topics, and forward JSON commands back to devices.
+  image:
+    src: /logo.svg
+    alt: WLED MQTT Bridge logo
+  actions:
+    - theme: brand
+      text: Get Started
+      link: /getting-started
+    - theme: alt
+      text: Configuration Reference
+      link: /configuration
+    - theme: alt
+      text: Deployment Guide
+      link: /deployment
+features:
+  - title: Deterministic Topic Contract
+    details: "Each controller publishes to predictable MQTT paths: state, info, effects, palettes, online, and command topics."
+  - title: Built for Operations
+    details: Includes dead-letter handling, resilient reconnect loops, optional metrics endpoint, and healthcheck mode for runtime monitoring.
+  - title: Production-Ready Containers
+    details: Multi-stage Docker build with small runtime image, multi-arch publishing, and CI container smoke tests.
+  - title: Fast Integration
+    details: Use with Home Assistant, Node-RED, or custom MQTT consumers without writing custom WLED polling glue code.
+---
 
-Bridge between multiple WLED controllers and MQTT, optimized for simple Docker Compose operation.
+## Quick links
 
-## Quick User Path
-
-1. [Getting Started](./getting-started)
-2. [Configuration](./configuration)
-3. [Topic Contract](./topic-contract)
-4. [Operations](./operations)
-5. [Troubleshooting](./troubleshooting)
-
-## What You Get
-
-- One container for multiple WLED controllers
-- Controller-scoped MQTT topics
-- Automatic reconnect behavior for MQTT and WLED outages
-- Healthcheck support for stable operation
-
-Developer-oriented details are collected on [Developer](./developer).
+- [Getting Started](/getting-started)
+- [Configuration](/configuration)
+- [Topic Contract](/topic-contract)
+- [Operations](/operations)
+- [Troubleshooting](/troubleshooting)
+- [Developer](/developer)
