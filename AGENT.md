@@ -43,7 +43,7 @@ Core behavior:
 - `docs/`
   - VitePress documentation source
 - `.github/workflows/`
-  - Docker build/publish, docs pages, auto release workflows
+  - Docker build/publish, docs pages, release workflows
 
 ## MQTT Topic Contract
 
@@ -118,16 +118,16 @@ Docs:
 
 - `test-build.yml`: validates Docker image builds on pushes.
 - `pages.yml`: builds and deploys docs to GitHub Pages from `docs/.vitepress/dist`.
-- `release.yml`: auto-release workflow on `main`/`master`:
-  - reads version from `Cargo.toml`
-  - creates/pushes tag `v<version>` if missing
-  - builds release tarball + sha256
-  - creates GitHub release
+- `release.yml`: release workflow on tag pushes (`v*`):
+  - builds musl release tarball + sha256
+  - extracts release notes from the matching `CHANGELOG.md` version section
+  - creates GitHub release for the pushed tag
+  - supports manual `workflow_dispatch` to seed an `Unreleased` changelog section
 - `deploy.yml`: publishes Docker image on tag pushes (`v*`), including `latest` and version tag.
 
 Important coupling:
 
-- `release.yml` creates tags, which trigger `deploy.yml`.
+- both `release.yml` and `deploy.yml` are triggered by pushed version tags.
 
 ## Docker Notes
 

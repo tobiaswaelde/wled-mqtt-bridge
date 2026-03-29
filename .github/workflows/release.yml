@@ -1,26 +1,17 @@
-name: Auto Release
+name: Release
 
 on:
   push:
-    branches:
-      - main
-      - master
+    tags:
+      - "v*"
   workflow_dispatch:
-    inputs:
-      draft:
-        description: "Create release as draft"
-        required: false
-        default: "false"
-        type: choice
-        options:
-          - "false"
-          - "true"
 
 permissions:
   contents: write
 
 jobs:
-  release:
+  publish:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
 
     steps:
@@ -29,82 +20,25 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Derive version and tag
-        id: version
-        shell: bash
-        run: |
-          version="$(grep '^version' Cargo.toml | head -1 | cut -d '"' -f2)"
-          tag="v${version}"
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
-
-      - name: Check if release tag exists
-        id: tag_check
-        shell: bash
-        run: |
-          tag="${{ steps.version.outputs.tag }}"
-          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Check version bump
-        id: version_gate
-        if: steps.tag_check.outputs.exists != 'true'
-        shell: bash
-        run: |
-          version="${{ steps.version.outputs.version }}"
-          latest_tag="$(git tag -l 'v*' --sort=-v:refname | head -n1)"
-
-          echo "latest_tag=${latest_tag}" >> "$GITHUB_OUTPUT"
-
-          if [ -z "$latest_tag" ]; then
-            echo "release_needed=true" >> "$GITHUB_OUTPUT"
-            echo "reason=no previous release tag found" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          latest_version="${latest_tag#v}"
-          highest="$(printf '%s\n%s\n' "$latest_version" "$version" | sort -V | tail -n1)"
-
-          if [ "$version" = "$latest_version" ]; then
-            echo "release_needed=false" >> "$GITHUB_OUTPUT"
-            echo "reason=version ${version} already released" >> "$GITHUB_OUTPUT"
-          elif [ "$highest" = "$version" ]; then
-            echo "release_needed=true" >> "$GITHUB_OUTPUT"
-            echo "reason=version increased from ${latest_version} to ${version}" >> "$GITHUB_OUTPUT"
-          else
-            echo "release_needed=false" >> "$GITHUB_OUTPUT"
-            echo "reason=version ${version} is not higher than latest ${latest_version}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Stop if release is not needed
-        if: steps.tag_check.outputs.exists == 'true' || steps.version_gate.outputs.release_needed != 'true'
-        run: echo "Skipping release."
-
       - name: Install Rust toolchain
-        if: steps.tag_check.outputs.exists != 'true' && steps.version_gate.outputs.release_needed == 'true'
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo
-        if: steps.tag_check.outputs.exists != 'true' && steps.version_gate.outputs.release_needed == 'true'
         uses: Swatinem/rust-cache@v2
 
-      - name: Build release binary
-        if: steps.tag_check.outputs.exists != 'true' && steps.version_gate.outputs.release_needed == 'true'
-        run: cargo build --release
+      - name: Install musl toolchain
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
 
-      - name: Prepare release notes
-        if: steps.tag_check.outputs.exists != 'true' && steps.version_gate.outputs.release_needed == 'true'
+      - name: Add musl target
+        run: rustup target add x86_64-unknown-linux-musl
+
+      - name: Build release binary (musl)
+        run: cargo build --release --target x86_64-unknown-linux-musl
+
+      - name: Extract release notes
         shell: bash
         run: |
-          version="${{ steps.version.outputs.version }}"
+          version="${GITHUB_REF_NAME#v}"
           notes_file="release-notes.md"
 
           awk -v version="$version" '
@@ -114,66 +48,75 @@ jobs:
           ' CHANGELOG.md > "$notes_file"
 
           if [ ! -s "$notes_file" ]; then
-            echo "Automated release for ${version}" > "$notes_file"
-            echo "" >> "$notes_file"
-            echo "No dedicated changelog section found in CHANGELOG.md." >> "$notes_file"
+            echo "No changelog entry found for ${version}" >&2
+            exit 1
           fi
 
       - name: Package release artifacts
-        if: steps.tag_check.outputs.exists != 'true' && steps.version_gate.outputs.release_needed == 'true'
         shell: bash
         run: |
-          version="${{ steps.version.outputs.version }}"
+          version="${GITHUB_REF_NAME#v}"
           staging="dist/wled-mqtt-bridge-${version}"
-          archive="dist/wled-mqtt-bridge-${version}-linux-x86_64.tar.gz"
+          archive="dist/wled-mqtt-bridge-${version}-linux-musl-x86_64.tar.gz"
 
           rm -rf dist
           mkdir -p "$staging"
-          cp target/release/wled-mqtt-bridge "$staging/"
+          cp target/x86_64-unknown-linux-musl/release/wled-mqtt-bridge "$staging/"
           cp LICENSE.txt README.md "$staging/"
 
           tar -C dist -czf "$archive" "wled-mqtt-bridge-${version}"
           sha256sum "$archive" > "${archive}.sha256"
 
-      - name: Create and push tag
-        if: steps.tag_check.outputs.exists != 'true' && steps.version_gate.outputs.release_needed == 'true'
-        shell: bash
-        run: |
-          tag="${{ steps.version.outputs.tag }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag "$tag"
-          git push origin "$tag"
-
-      - name: Create GitHub release
-        if: steps.tag_check.outputs.exists != 'true' && steps.version_gate.outputs.release_needed == 'true'
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: WLED MQTT Bridge ${{ steps.version.outputs.tag }}
-          tag_name: ${{ steps.version.outputs.tag }}
-          draft: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.draft == 'true' }}
+          name: WLED MQTT Bridge ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
           body_path: release-notes.md
           files: |
             dist/*.tar.gz
             dist/*.sha256
 
-      - name: Release summary
-        if: always()
+  seed_changelog:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Seed Unreleased changelog section
         shell: bash
         run: |
-          {
-            echo "## Auto Release Summary"
-            echo ""
-            echo "- Target version: \`${{ steps.version.outputs.version }}\`"
-            echo "- Target tag: \`${{ steps.version.outputs.tag }}\`"
-            if [ "${{ steps.tag_check.outputs.exists }}" = "true" ]; then
-              echo "- Result: skipped (tag already exists)"
-            elif [ "${{ steps.version_gate.outputs.release_needed }}" = "true" ]; then
-              echo "- Result: release created"
-              echo "- Reason: ${{ steps.version_gate.outputs.reason }}"
-            else
-              echo "- Result: skipped (no version bump)"
-              echo "- Reason: ${{ steps.version_gate.outputs.reason }}"
-              echo "- Latest tag: \`${{ steps.version_gate.outputs.latest_tag }}\`"
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          if grep -q '^## \[Unreleased\]' CHANGELOG.md; then
+            echo "Unreleased section already exists."
+            exit 0
+          fi
+
+          tmp="$(mktemp)"
+          awk '
+            BEGIN { inserted = 0 }
+            /^## \[/ && !inserted {
+              print "## [Unreleased]"
+              print ""
+              inserted = 1
+            }
+            { print }
+          ' CHANGELOG.md > "$tmp"
+          mv "$tmp" CHANGELOG.md
+
+      - name: Commit changelog update
+        shell: bash
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if git diff --quiet -- CHANGELOG.md; then
+            echo "No changelog update required."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "docs: seed unreleased changelog section"
+          git push origin HEAD:"$DEFAULT_BRANCH"

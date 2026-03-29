@@ -27,7 +27,7 @@ cargo clippy --all-targets --all-features -- -D warnings
 
 - `rust-ci.yml`: fmt, clippy, check, tests
 - `pages.yml`: docs build + GitHub Pages deploy
-- `release.yml`: auto-release from `Cargo.toml` version
+- `release.yml`: GitHub release on pushed `v*` tags (+ changelog seed on manual dispatch)
 - `deploy.yml`: Docker publish on pushed tags
 
 ## Runtime additions
