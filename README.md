@@ -1,145 +1,144 @@
-# WLED-MQTT bridge
+<div align="center">
+  <img src="docs/public/logo.svg" alt="WLED MQTT Bridge" width="120" />
 
-![Docker Build](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/test-build.yml/badge.svg)
-![Docker Deploy](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/deploy.yml/badge.svg)
-![Version](https://img.shields.io/github/v/tag/tobiaswaelde/wled-mqtt-bridge?label=version)
+  # WLED MQTT Bridge
 
-A lightweight Rust service that connects multiple [WLED](https://kno.wled.ge/) controllers with MQTT.
+  [![Rust CI](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/rust-ci.yml/badge.svg)](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/rust-ci.yml)
+  [![Docker Build](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/test-build.yml/badge.svg)](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/test-build.yml)
+  [![Docker Deploy](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/deploy.yml/badge.svg)](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/deploy.yml)
+  [![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/tobiaswaelde/wled-mqtt-bridge/blob/main/Cargo.toml)
+  [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/tobiaswaelde/wled-mqtt-bridge/blob/main/LICENSE.txt)
 
-## Quick Start (Docker Compose)
+  Rust bridge between WLED controllers and MQTT topics.
+
+  [Documentation](https://tobiaswaelde.github.io/wled-mqtt-bridge/) |
+  [Getting Started](https://tobiaswaelde.github.io/wled-mqtt-bridge/getting-started) |
+  [Configuration](https://tobiaswaelde.github.io/wled-mqtt-bridge/configuration) |
+  [Deployment](https://tobiaswaelde.github.io/wled-mqtt-bridge/deployment)
+</div>
+
+## Table of Contents
+
+- [Why this project](#why-this-project)
+- [Features](#features)
+- [Quick start](#quick-start)
+- [Topic contract](#topic-contract)
+- [Minimal configuration](#minimal-configuration)
+- [Run locally (without Docker)](#run-locally-without-docker)
+- [Documentation](#documentation)
+- [Project files](#project-files)
+- [Changelog](#changelog)
+- [License](#license)
+
+## Why this project
+
+`wled-mqtt-bridge` polls one or more WLED controllers and publishes state, info, effects, and palettes to predictable MQTT topics. It also listens for command payloads per controller and forwards them to WLED.
+
+Use it when you want one stable integration layer between WLED devices and systems like Home Assistant, Node-RED, or custom MQTT consumers.
+
+## Features
+
+- Multi-controller polling with independent runtime loops
+- Predictable MQTT topic contract (`cmd`, `state`, `info`, `effects`, `palettes`, `online`)
+- Typed config validation with startup invariants
+- Dead-letter publishing for invalid commands
+- Optional Prometheus metrics endpoint
+- Docker-ready with multi-arch images (`linux/amd64`, `linux/arm64`)
+
+## Quick start
+
+### 1. Run with Docker Compose (recommended)
 
 ```bash
 git clone https://github.com/tobiaswaelde/wled-mqtt-bridge.git
 cd wled-mqtt-bridge
 cp config/config.example.yml config/config.yml
-# edit config/config.yml
+# edit config/config.yml for your broker and controllers
 
 docker compose up -d
 ```
 
-## Daily Use
-
-Status:
+### 2. Verify data flow
 
 ```bash
-docker compose ps
+mosquitto_sub -h <mqtt-host> -t 'wled/#' -v
 ```
 
-Logs:
+Optional command test:
 
 ```bash
-docker compose logs -f wled-mqtt-bridge
+mosquitto_pub -h <mqtt-host> -t 'wled/living-room/cmd' -m '{"on":true}'
 ```
 
-Update:
+## Topic contract
 
-```bash
-docker compose pull
-docker compose up -d
-```
+For:
 
-Optional: pin an image version
+- `mqtt.base_topic = wled`
+- `controller.id = living-room`
 
-```bash
-IMAGE_TAG=v1.0.2 docker compose up -d
-```
+Topics:
 
-## Configuration (for users)
+- Commands: `wled/living-room/cmd`
+- Online: `wled/living-room/online`
+- State: `wled/living-room/state`
+- Info: `wled/living-room/info`
+- Effects: `wled/living-room/effects`
+- Palettes: `wled/living-room/palettes`
 
-Main fields in `config/config.yml`:
+Bridge-level topics:
 
-- `mqtt.host`, `mqtt.port`, `mqtt.username`, `mqtt.password`
-- `mqtt.base_topic`
-- `mqtt.dead_letter_suffix`
-- `wled.controllers[]` with `id` + `host`
+- `wled/bridge_online`
+- `wled/dead_letter` (default suffix, configurable)
 
-Example:
+## Minimal configuration
 
 ```yaml
 mqtt:
-  protocol: mqtt
-  host: 192.168.1.10
-  port: 1883
-  username: mqtt-user
-  password: mqtt-password
+  host: localhost
   base_topic: wled
-  dead_letter_suffix: dead_letter
 
 wled:
   controllers:
     - id: living-room
       host: 192.168.1.50
-    - id: office
-      host: 192.168.1.51
 ```
 
-## MQTT Topics
+Full config reference: https://tobiaswaelde.github.io/wled-mqtt-bridge/configuration
 
-For controller `living-room`:
-
-- `wled/living-room/cmd`
-- `wled/living-room/online`
-- `wled/living-room/state`
-- `wled/living-room/info`
-- `wled/living-room/effects`
-- `wled/living-room/palettes`
-
-Bridge availability:
-
-- `wled/bridge_online`
-
-Dead-letter (default):
-
-- `wled/dead_letter`
-
-## Optional Metrics
-
-Enable in config:
-
-```yaml
-metrics:
-  enabled: true
-  host: 0.0.0.0
-  port: 9090
-  path: /metrics
-```
-
-Then scrape:
-
-```text
-http://<host>:9090/metrics
-```
-
-## Container Images
-
-- Multi-arch images are published for `linux/amd64` and `linux/arm64`
-- Images are signed with Cosign (keyless)
-- SPDX SBOM artifacts are generated during image publish
-
-## Documentation
-
-Full docs are in `docs/` and published via GitHub Pages.
-
-- User docs start at [`docs/index.md`](docs/index.md)
-- Developer details are on [`docs/developer.md`](docs/developer.md)
-
-## For Developers (moved down intentionally)
-
-Local run:
+## Run locally (without Docker)
 
 ```bash
 cargo run -- --config config/config.yml
 ```
 
-Checks:
+## Documentation
+
+Docs are built with VitePress from `docs/`.
 
 ```bash
-cargo fmt --all
-cargo check
-cargo test
-cargo clippy --all-targets --all-features -- -D warnings
+cd docs
+npm install
+npm run dev
 ```
+
+Production docs are published via GitHub Pages:
+
+- https://tobiaswaelde.github.io/wled-mqtt-bridge/
+
+## Project files
+
+- `src/` runtime and bridge logic
+- `config/config.example.yml` starter config template
+- `docs/` VitePress documentation source
+- `Dockerfile` multi-stage Rust build with scratch runtime
+- `compose.yml` local deployment template
 
 ## Changelog
 
-See [CHANGELOG.md](./CHANGELOG.md).
+See [CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+Licensed under the MIT License.
+See [LICENSE.txt](LICENSE.txt).
