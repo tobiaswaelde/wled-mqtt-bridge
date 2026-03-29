@@ -1,35 +1,46 @@
 ### ####################
 ### BUILDER
 ### ####################
-FROM node:lts-alpine AS build
+FROM rust:1.87-alpine AS build
 
-# Install build tools (needed for some deps)
-RUN apk add --no-cache python3 make g++
+RUN apk add --no-cache musl-dev pkgconfig openssl-dev ca-certificates
 
 WORKDIR /app
 
-# Install dependencies
-COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+ARG TARGETARCH
 
-# Copy source
-COPY . .
+COPY Cargo.toml .
+COPY Cargo.lock .
+COPY src ./src
+COPY config ./config
 
-# Build TypeScript -> JS
-RUN yarn build
-
-# Bundle into single JS file
-RUN yarn bundle
-
+# Build a fully static binary for a scratch runtime for the current target arch.
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+      amd64) RUST_TARGET="x86_64-unknown-linux-musl" ;; \
+      arm64) RUST_TARGET="aarch64-unknown-linux-musl" ;; \
+      *) echo "unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    rustup target add "${RUST_TARGET}"; \
+    cargo build --release --locked --target "${RUST_TARGET}"; \
+    cp "/app/target/${RUST_TARGET}/release/wled-mqtt-bridge" /app/wled-mqtt-bridge
 
 ### ####################
 ### RUNNER
 ### ####################
-FROM node:lts-alpine AS runtime
+FROM scratch AS runtime
 
 WORKDIR /app
 
-# Copy only bundled output (no node_modules needed)
-COPY --from=build /app/dist ./dist
+COPY --from=build /app/wled-mqtt-bridge /app/wled-mqtt-bridge
+COPY --from=build /app/config/config.example.yml /app/config/config.example.yml
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
-CMD ["node", "dist/index.js"]
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD ["/app/wled-mqtt-bridge", "--config", "/app/config/config.yml", "--healthcheck"]
+
+USER 10001:10001
+
+CMD ["/app/wled-mqtt-bridge", "--config", "/app/config/config.yml"]
