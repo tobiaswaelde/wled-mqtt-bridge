@@ -45,24 +45,54 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Stop if version already released
-        if: steps.tag_check.outputs.exists == 'true'
-        run: echo "Tag ${{ steps.version.outputs.tag }} already exists. Skipping release."
+      - name: Check version bump
+        id: version_gate
+        if: steps.tag_check.outputs.exists != 'true'
+        shell: bash
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          latest_tag="$(git tag -l 'v*' --sort=-v:refname | head -n1)"
+
+          echo "latest_tag=${latest_tag}" >> "$GITHUB_OUTPUT"
+
+          if [ -z "$latest_tag" ]; then
+            echo "release_needed=true" >> "$GITHUB_OUTPUT"
+            echo "reason=no previous release tag found" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          latest_version="${latest_tag#v}"
+          highest="$(printf '%s\n%s\n' "$latest_version" "$version" | sort -V | tail -n1)"
+
+          if [ "$version" = "$latest_version" ]; then
+            echo "release_needed=false" >> "$GITHUB_OUTPUT"
+            echo "reason=version ${version} already released" >> "$GITHUB_OUTPUT"
+          elif [ "$highest" = "$version" ]; then
+            echo "release_needed=true" >> "$GITHUB_OUTPUT"
+            echo "reason=version increased from ${latest_version} to ${version}" >> "$GITHUB_OUTPUT"
+          else
+            echo "release_needed=false" >> "$GITHUB_OUTPUT"
+            echo "reason=version ${version} is not higher than latest ${latest_version}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Stop if release is not needed
+        if: steps.tag_check.outputs.exists == 'true' || steps.version_gate.outputs.release_needed != 'true'
+        run: echo "Skipping release."
 
       - name: Install Rust toolchain
-        if: steps.tag_check.outputs.exists != 'true'
+        if: steps.tag_check.outputs.exists != 'true' && steps.version_gate.outputs.release_needed == 'true'
         uses: dtolnay/rust-toolchain@stable
 
       - name: Cache cargo
-        if: steps.tag_check.outputs.exists != 'true'
+        if: steps.tag_check.outputs.exists != 'true' && steps.version_gate.outputs.release_needed == 'true'
         uses: Swatinem/rust-cache@v2
 
       - name: Build release binary
-        if: steps.tag_check.outputs.exists != 'true'
+        if: steps.tag_check.outputs.exists != 'true' && steps.version_gate.outputs.release_needed == 'true'
         run: cargo build --release
 
       - name: Prepare release notes
-        if: steps.tag_check.outputs.exists != 'true'
+        if: steps.tag_check.outputs.exists != 'true' && steps.version_gate.outputs.release_needed == 'true'
         shell: bash
         run: |
           version="${{ steps.version.outputs.version }}"
@@ -81,7 +111,7 @@ jobs:
           fi
 
       - name: Package release artifacts
-        if: steps.tag_check.outputs.exists != 'true'
+        if: steps.tag_check.outputs.exists != 'true' && steps.version_gate.outputs.release_needed == 'true'
         shell: bash
         run: |
           version="${{ steps.version.outputs.version }}"
@@ -97,7 +127,7 @@ jobs:
           sha256sum "$archive" > "${archive}.sha256"
 
       - name: Create and push tag
-        if: steps.tag_check.outputs.exists != 'true'
+        if: steps.tag_check.outputs.exists != 'true' && steps.version_gate.outputs.release_needed == 'true'
         shell: bash
         run: |
           tag="${{ steps.version.outputs.tag }}"
@@ -107,7 +137,7 @@ jobs:
           git push origin "$tag"
 
       - name: Create GitHub release
-        if: steps.tag_check.outputs.exists != 'true'
+        if: steps.tag_check.outputs.exists != 'true' && steps.version_gate.outputs.release_needed == 'true'
         uses: softprops/action-gh-release@v2
         with:
           name: WLED MQTT Bridge ${{ steps.version.outputs.tag }}
@@ -116,3 +146,24 @@ jobs:
           files: |
             dist/*.tar.gz
             dist/*.sha256
+
+      - name: Release summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Auto Release Summary"
+            echo ""
+            echo "- Target version: \`${{ steps.version.outputs.version }}\`"
+            echo "- Target tag: \`${{ steps.version.outputs.tag }}\`"
+            if [ "${{ steps.tag_check.outputs.exists }}" = "true" ]; then
+              echo "- Result: skipped (tag already exists)"
+            elif [ "${{ steps.version_gate.outputs.release_needed }}" = "true" ]; then
+              echo "- Result: release created"
+              echo "- Reason: ${{ steps.version_gate.outputs.reason }}"
+            else
+              echo "- Result: skipped (no version bump)"
+              echo "- Reason: ${{ steps.version_gate.outputs.reason }}"
+              echo "- Latest tag: \`${{ steps.version_gate.outputs.latest_tag }}\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
