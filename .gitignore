@@ -1,12 +1,13 @@
-# packages
-node_modules/
+# Rust
+/target/
 
-# build files
-build/
-dist/
+# docs
+/docs/.vitepress/.temp/
+/docs/.vitepress/dist/
+/docs/node_modules/
+
+# runtime config override
+config/config.yml
 
 # misc
 .DS_Store
-
-*.env
-!.env.example

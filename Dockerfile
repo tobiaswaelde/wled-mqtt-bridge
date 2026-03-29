@@ -1,35 +1,28 @@
 ### ####################
 ### BUILDER
 ### ####################
-FROM node:lts-alpine AS build
+FROM rust:1.87-alpine AS build
 
-# Install build tools (needed for some deps)
-RUN apk add --no-cache python3 make g++
+RUN apk add --no-cache musl-dev pkgconfig openssl-dev
 
 WORKDIR /app
 
-# Install dependencies
-COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
+COPY Cargo.toml .
+COPY src ./src
+COPY config ./config
 
-# Copy source
-COPY . .
-
-# Build TypeScript -> JS
-RUN yarn build
-
-# Bundle into single JS file
-RUN yarn bundle
-
+RUN cargo build --release
 
 ### ####################
 ### RUNNER
 ### ####################
-FROM node:lts-alpine AS runtime
+FROM alpine:3.21 AS runtime
+
+RUN apk add --no-cache ca-certificates
 
 WORKDIR /app
 
-# Copy only bundled output (no node_modules needed)
-COPY --from=build /app/dist ./dist
+COPY --from=build /app/target/release/wled-mqtt-bridge /app/wled-mqtt-bridge
+COPY --from=build /app/config/config.example.yml /app/config/config.example.yml
 
-CMD ["node", "dist/index.js"]
+CMD ["/app/wled-mqtt-bridge", "--config", "/app/config/config.yml"]
