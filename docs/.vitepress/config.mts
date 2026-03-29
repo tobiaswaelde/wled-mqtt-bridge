@@ -41,7 +41,8 @@ const config = defineConfig({
     ],
     footer: {
       message: "Released under MIT License",
-      copyright: "Copyright 2026 Tobias Wälde (https://tobiaswaelde.com)"
+      copyright:
+        '© 2026 <a href="https://tobiaswaelde.com" target="_blank" rel="noopener noreferrer">Tobias Wälde</a>'
     }
   }
 });
