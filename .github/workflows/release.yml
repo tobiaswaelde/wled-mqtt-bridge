@@ -6,6 +6,15 @@ on:
       - main
       - master
   workflow_dispatch:
+    inputs:
+      draft:
+        description: "Create release as draft"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 permissions:
   contents: write
@@ -142,6 +151,7 @@ jobs:
         with:
           name: WLED MQTT Bridge ${{ steps.version.outputs.tag }}
           tag_name: ${{ steps.version.outputs.tag }}
+          draft: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.draft == 'true' }}
           body_path: release-notes.md
           files: |
             dist/*.tar.gz
