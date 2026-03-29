@@ -1,12 +1,14 @@
 {
   "name": "wled-mqtt-bridge-docs",
   "private": true,
+  "version": "2.0.0",
   "scripts": {
-    "dev": "vitepress dev",
-    "build": "vitepress build",
-    "preview": "vitepress preview"
+    "dev": "vitepress dev .",
+    "build": "vitepress build .",
+    "preview": "vitepress preview ."
   },
-  "devDependencies": {
-    "vitepress": "^1.5.0"
+  "dependencies": {
+    "vitepress": "^1.6.4",
+    "vitepress-plugin-mermaid": "^2.0.17"
   }
 }

@@ -1,5 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="WLED MQTT Bridge logo">
-  <rect width="128" height="128" rx="20" fill="#0f172a"/>
-  <circle cx="64" cy="64" r="38" fill="#22d3ee"/>
-  <circle cx="64" cy="64" r="20" fill="#f59e0b"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none" role="img" aria-label="WLED MQTT Bridge logo">
+  <rect width="128" height="128" rx="24" fill="#0f172a"/>
+  <rect x="16" y="48" width="24" height="32" rx="8" fill="#2dd4bf"/>
+  <rect x="88" y="48" width="24" height="32" rx="8" fill="#38bdf8"/>
+  <circle cx="64" cy="64" r="18" fill="#f59e0b"/>
+  <path d="M40 64H50M78 64H88" stroke="#e2e8f0" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="64" cy="64" r="8" fill="#0f172a"/>
+  <path d="M64 20c9 0 16 7 16 16" stroke="#f59e0b" stroke-width="5" stroke-linecap="round"/>
+  <path d="M64 12c13 0 24 11 24 24" stroke="#fbbf24" stroke-width="4" stroke-linecap="round" opacity=".9"/>
+  <path d="M64 108c-9 0-16-7-16-16" stroke="#22d3ee" stroke-width="5" stroke-linecap="round"/>
+  <path d="M64 116c-13 0-24-11-24-24" stroke="#67e8f9" stroke-width="4" stroke-linecap="round" opacity=".9"/>
 </svg>
