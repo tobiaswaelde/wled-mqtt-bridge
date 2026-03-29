@@ -4,6 +4,7 @@ use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AppConfig {
     pub mqtt: MqttConfig,
     pub wled: WledConfig,
@@ -40,8 +41,27 @@ impl AppConfig {
     }
 
     pub fn validate(&self) -> Result<()> {
+        if self.mqtt.protocol.trim().is_empty() {
+            bail!("mqtt.protocol cannot be empty");
+        }
+
+        if !matches!(
+            self.mqtt.protocol.to_ascii_lowercase().as_str(),
+            "mqtt" | "mqtts"
+        ) {
+            bail!("mqtt.protocol must be 'mqtt' or 'mqtts'");
+        }
+
         if self.mqtt.host.trim().is_empty() {
             bail!("mqtt.host cannot be empty");
+        }
+
+        if self.mqtt.port == 0 {
+            bail!("mqtt.port must be greater than 0");
+        }
+
+        if self.mqtt.client_id.trim().is_empty() {
+            bail!("mqtt.client_id cannot be empty");
         }
 
         if self.mqtt.base_topic.trim().is_empty() {
@@ -52,8 +72,50 @@ impl AppConfig {
             bail!("mqtt.dead_letter_suffix cannot be empty");
         }
 
+        if self.mqtt.keep_alive_secs == 0 {
+            bail!("mqtt.keep_alive_secs must be greater than 0");
+        }
+
+        if self.mqtt.reconnect_delay_secs == 0 {
+            bail!("mqtt.reconnect_delay_secs must be greater than 0");
+        }
+
+        if self.mqtt.reconnect_max_delay_secs == 0 {
+            bail!("mqtt.reconnect_max_delay_secs must be greater than 0");
+        }
+
+        if self.mqtt.reconnect_max_delay_secs < self.mqtt.reconnect_delay_secs {
+            bail!("mqtt.reconnect_max_delay_secs must be >= mqtt.reconnect_delay_secs");
+        }
+
+        if self.polling.interval_ms == 0 {
+            bail!("polling.interval_ms must be greater than 0");
+        }
+
+        if self.polling.timeout_ms == 0 {
+            bail!("polling.timeout_ms must be greater than 0");
+        }
+
+        if self.polling.timeout_duration_ms == 0 {
+            bail!("polling.timeout_duration_ms must be greater than 0");
+        }
+
+        if let Some(timeout_ms) = self.wled.http_timeout_ms {
+            if timeout_ms == 0 {
+                bail!("wled.http_timeout_ms must be greater than 0");
+            }
+        }
+
         if self.metrics.path.trim().is_empty() || !self.metrics.path.starts_with('/') {
             bail!("metrics.path must start with '/'");
+        }
+
+        if self.metrics.port == 0 {
+            bail!("metrics.port must be greater than 0");
+        }
+
+        if self.logging.level.trim().is_empty() {
+            bail!("logging.level cannot be empty");
         }
 
         let controllers = &self.wled.controllers;
@@ -75,6 +137,42 @@ impl AppConfig {
                 bail!("wled controller '{}' host cannot be empty", controller.id);
             }
 
+            if let Some(interval_ms) = controller.interval_ms {
+                if interval_ms == 0 {
+                    bail!(
+                        "wled controller '{}' interval_ms must be greater than 0",
+                        controller.id
+                    );
+                }
+            }
+
+            if let Some(timeout_ms) = controller.timeout_ms {
+                if timeout_ms == 0 {
+                    bail!(
+                        "wled controller '{}' timeout_ms must be greater than 0",
+                        controller.id
+                    );
+                }
+            }
+
+            if let Some(timeout_duration_ms) = controller.timeout_duration_ms {
+                if timeout_duration_ms == 0 {
+                    bail!(
+                        "wled controller '{}' timeout_duration_ms must be greater than 0",
+                        controller.id
+                    );
+                }
+            }
+
+            if let Some(http_timeout_ms) = controller.http_timeout_ms {
+                if http_timeout_ms == 0 {
+                    bail!(
+                        "wled controller '{}' http_timeout_ms must be greater than 0",
+                        controller.id
+                    );
+                }
+            }
+
             if !ids.insert(controller.id.clone()) {
                 bail!("duplicate wled controller id '{}'", controller.id);
             }
@@ -94,9 +192,14 @@ impl AppConfig {
                 .unwrap_or(self.polling.timeout_duration_ms),
         }
     }
+
+    pub fn http_timeout_ms_for_controller(&self, controller: &WledControllerConfig) -> Option<u64> {
+        controller.http_timeout_ms.or(self.wled.http_timeout_ms)
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MqttConfig {
     #[serde(default = "default_mqtt_protocol")]
     pub protocol: String,
@@ -117,14 +220,20 @@ pub struct MqttConfig {
     pub keep_alive_secs: u64,
     #[serde(default = "default_reconnect_delay_secs")]
     pub reconnect_delay_secs: u64,
+    #[serde(default = "default_reconnect_max_delay_secs")]
+    pub reconnect_max_delay_secs: u64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct WledConfig {
+    #[serde(default)]
+    pub http_timeout_ms: Option<u64>,
     pub controllers: Vec<WledControllerConfig>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct WledControllerConfig {
     pub id: String,
     pub host: String,
@@ -134,9 +243,12 @@ pub struct WledControllerConfig {
     pub timeout_ms: Option<u64>,
     #[serde(default)]
     pub timeout_duration_ms: Option<u64>,
+    #[serde(default)]
+    pub http_timeout_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PollingConfig {
     #[serde(default = "default_poll_interval_ms")]
     pub interval_ms: u64,
@@ -157,6 +269,7 @@ impl Default for PollingConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PublishConfig {
     #[serde(default = "default_true")]
     pub json_object: bool,
@@ -200,6 +313,7 @@ impl Default for PublishConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct QosConfig {
     #[serde(default = "default_qos_0")]
     pub state: u8,
@@ -235,6 +349,7 @@ impl Default for QosConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RetainConfig {
     #[serde(default)]
     pub state: bool,
@@ -270,6 +385,7 @@ impl Default for RetainConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MetricsConfig {
     #[serde(default)]
     pub enabled: bool,
@@ -293,6 +409,7 @@ impl Default for MetricsConfig {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LoggingConfig {
     #[serde(default = "default_log_level")]
     pub level: String,
@@ -335,6 +452,10 @@ fn default_keep_alive_secs() -> u64 {
 
 fn default_reconnect_delay_secs() -> u64 {
     5
+}
+
+fn default_reconnect_max_delay_secs() -> u64 {
+    60
 }
 
 fn default_poll_interval_ms() -> u64 {
@@ -394,8 +515,10 @@ mod tests {
                 dead_letter_suffix: "dead_letter".to_string(),
                 keep_alive_secs: 30,
                 reconnect_delay_secs: 5,
+                reconnect_max_delay_secs: 60,
             },
             wled: WledConfig {
+                http_timeout_ms: None,
                 controllers: vec![
                     WledControllerConfig {
                         id: "living-room".to_string(),
@@ -403,6 +526,7 @@ mod tests {
                         interval_ms: None,
                         timeout_ms: None,
                         timeout_duration_ms: None,
+                        http_timeout_ms: None,
                     },
                     WledControllerConfig {
                         id: "office".to_string(),
@@ -410,6 +534,7 @@ mod tests {
                         interval_ms: None,
                         timeout_ms: None,
                         timeout_duration_ms: None,
+                        http_timeout_ms: None,
                     },
                 ],
             },
@@ -480,5 +605,43 @@ mod tests {
         assert_eq!(polling.interval_ms, 1500);
         assert_eq!(polling.timeout_ms, 45000);
         assert_eq!(polling.timeout_duration_ms, 60000);
+    }
+
+    #[test]
+    fn controller_http_timeout_overrides_global_value() {
+        let mut cfg = valid_config();
+        cfg.wled.http_timeout_ms = Some(3500);
+        cfg.wled.controllers[0].http_timeout_ms = Some(5000);
+
+        let timeout = cfg.http_timeout_ms_for_controller(&cfg.wled.controllers[0]);
+        assert_eq!(timeout, Some(5000));
+
+        let timeout = cfg.http_timeout_ms_for_controller(&cfg.wled.controllers[1]);
+        assert_eq!(timeout, Some(3500));
+    }
+
+    #[test]
+    fn validate_rejects_invalid_mqtt_protocol() {
+        let mut cfg = valid_config();
+        cfg.mqtt.protocol = "ws".to_string();
+        let err = cfg.validate().expect_err("expected validation error");
+        assert!(err.to_string().contains("mqtt.protocol"));
+    }
+
+    #[test]
+    fn validate_rejects_zero_http_timeout() {
+        let mut cfg = valid_config();
+        cfg.wled.http_timeout_ms = Some(0);
+        let err = cfg.validate().expect_err("expected validation error");
+        assert!(err.to_string().contains("wled.http_timeout_ms"));
+    }
+
+    #[test]
+    fn validate_rejects_reconnect_window_mismatch() {
+        let mut cfg = valid_config();
+        cfg.mqtt.reconnect_delay_secs = 20;
+        cfg.mqtt.reconnect_max_delay_secs = 10;
+        let err = cfg.validate().expect_err("expected validation error");
+        assert!(err.to_string().contains("reconnect_max_delay_secs"));
     }
 }

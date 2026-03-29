@@ -16,6 +16,7 @@ use core::{
 };
 
 pub async fn run(config: AppConfig, metrics: Arc<BridgeMetrics>) -> Result<()> {
+    let cmd_wildcard = format!("{}/+/cmd", config.mqtt.base_topic);
     let controllers = config.wled.controllers.clone();
     let controller_map: HashMap<String, ControllerRuntime> = controllers
         .iter()
@@ -28,6 +29,7 @@ pub async fn run(config: AppConfig, metrics: Arc<BridgeMetrics>) -> Result<()> {
                     &controller.id,
                 )),
                 polling: config.polling_for_controller(controller),
+                http_timeout_ms: config.http_timeout_ms_for_controller(controller),
             };
             (controller.id.clone(), runtime)
         })
@@ -64,8 +66,7 @@ pub async fn run(config: AppConfig, metrics: Arc<BridgeMetrics>) -> Result<()> {
     }
 
     let (mqtt, mut eventloop) = AsyncClient::new(mqtt_options, 200);
-    let cmd_wildcard = format!("{}/+/cmd", config.mqtt.base_topic);
-    mqtt.subscribe(cmd_wildcard, rumqttc::QoS::AtMostOnce)
+    mqtt.subscribe(cmd_wildcard.clone(), rumqttc::QoS::AtMostOnce)
         .await
         .context("failed to subscribe to command wildcard topic")?;
 
@@ -83,17 +84,29 @@ pub async fn run(config: AppConfig, metrics: Arc<BridgeMetrics>) -> Result<()> {
     let (cmd_tx, mut cmd_rx) = mpsc::channel::<CommandMessage>(256);
     let mqtt_for_events = mqtt.clone();
     let reconnect_delay = config.mqtt.reconnect_delay_secs;
+    let reconnect_max_delay = config.mqtt.reconnect_max_delay_secs;
     let base_topic = config.mqtt.base_topic.clone();
     let publish_for_events = config.publish.clone();
     let metrics_for_events = metrics.clone();
     let dead_letter_for_events = dead_letter_topic.clone();
+    let cmd_wildcard_for_events = cmd_wildcard.clone();
 
     tokio::spawn(async move {
+        let mut reconnect_delay_secs = reconnect_delay.max(1);
         loop {
             match eventloop.poll().await {
                 Ok(Event::Incoming(Incoming::ConnAck(_))) => {
                     info!("mqtt connected");
                     metrics_for_events.inc_mqtt_connack();
+                    reconnect_delay_secs = reconnect_delay.max(1);
+
+                    if let Err(err) = mqtt_for_events
+                        .subscribe(cmd_wildcard_for_events.clone(), rumqttc::QoS::AtMostOnce)
+                        .await
+                    {
+                        warn!(?err, "failed to re-subscribe to command wildcard topic");
+                    }
+
                     if let Err(err) = publish_topic(
                         &mqtt_for_events,
                         &publish_for_events,
@@ -145,8 +158,14 @@ pub async fn run(config: AppConfig, metrics: Arc<BridgeMetrics>) -> Result<()> {
                 Ok(_) => {}
                 Err(err) => {
                     metrics_for_events.inc_mqtt_eventloop_error();
-                    warn!(?err, "mqtt eventloop error");
-                    time::sleep(std::time::Duration::from_secs(reconnect_delay.max(1))).await;
+                    warn!(
+                        ?err,
+                        reconnect_in_secs = reconnect_delay_secs,
+                        "mqtt eventloop error"
+                    );
+                    time::sleep(std::time::Duration::from_secs(reconnect_delay_secs)).await;
+                    reconnect_delay_secs =
+                        (reconnect_delay_secs.saturating_mul(2)).min(reconnect_max_delay.max(1));
                 }
             }
         }
@@ -245,6 +264,7 @@ pub async fn run(config: AppConfig, metrics: Arc<BridgeMetrics>) -> Result<()> {
                 &controller.id,
             )),
             polling: config.polling_for_controller(&controller),
+            http_timeout_ms: config.http_timeout_ms_for_controller(&controller),
         };
 
         let mqtt_for_poll = mqtt.clone();
@@ -385,7 +405,14 @@ async fn handle_command(
 
     match command {
         WledCommand::SetState { state } => {
-            handle_http_post(http, &controller.wled_base, "/json/state", &state).await?;
+            handle_http_post(
+                http,
+                &controller.wled_base,
+                "/json/state",
+                &state,
+                controller.http_timeout_ms,
+            )
+            .await?;
             publish_state(mqtt, http, controller, config, metrics).await?;
         }
         WledCommand::GetState => {
@@ -412,7 +439,13 @@ async fn publish_state(
     config: &AppConfig,
     metrics: &BridgeMetrics,
 ) -> Result<()> {
-    let value = handle_http_get(http, &controller.wled_base, "/json/state").await?;
+    let value = handle_http_get(
+        http,
+        &controller.wled_base,
+        "/json/state",
+        controller.http_timeout_ms,
+    )
+    .await?;
     core::publish_json_with_keys(
         mqtt,
         &config.publish,
@@ -431,7 +464,13 @@ async fn publish_info(
     config: &AppConfig,
     metrics: &BridgeMetrics,
 ) -> Result<()> {
-    let value = handle_http_get(http, &controller.wled_base, "/json/info").await?;
+    let value = handle_http_get(
+        http,
+        &controller.wled_base,
+        "/json/info",
+        controller.http_timeout_ms,
+    )
+    .await?;
     core::publish_json_with_keys(
         mqtt,
         &config.publish,
@@ -450,7 +489,13 @@ async fn publish_effects(
     config: &AppConfig,
     metrics: &BridgeMetrics,
 ) -> Result<()> {
-    let value = handle_http_get(http, &controller.wled_base, "/json/eff").await?;
+    let value = handle_http_get(
+        http,
+        &controller.wled_base,
+        "/json/eff",
+        controller.http_timeout_ms,
+    )
+    .await?;
     publish_topic(
         mqtt,
         &config.publish,
@@ -471,7 +516,13 @@ async fn publish_palettes(
     config: &AppConfig,
     metrics: &BridgeMetrics,
 ) -> Result<()> {
-    let value = handle_http_get(http, &controller.wled_base, "/json/pal").await?;
+    let value = handle_http_get(
+        http,
+        &controller.wled_base,
+        "/json/pal",
+        controller.http_timeout_ms,
+    )
+    .await?;
     publish_topic(
         mqtt,
         &config.publish,

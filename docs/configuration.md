@@ -26,9 +26,13 @@ wled:
 
 - `mqtt.base_topic`: topic root used by all bridge topics
 - `mqtt.dead_letter_suffix`: topic suffix for invalid command/error payloads
+- `mqtt.reconnect_delay_secs`: initial reconnect delay after MQTT event-loop errors
+- `mqtt.reconnect_max_delay_secs`: max delay for exponential MQTT reconnect backoff
 - `wled.controllers[].id`: unique topic segment per controller
 - `wled.controllers[].host`: controller address
 - `wled.controllers[].interval_ms|timeout_ms|timeout_duration_ms`: optional per-controller polling override
+- `wled.http_timeout_ms`: optional global timeout for WLED HTTP requests
+- `wled.controllers[].http_timeout_ms`: optional per-controller override for WLED HTTP request timeout
 - `polling.interval_ms`: normal polling interval
 - `polling.timeout_ms`: failure duration before slow polling starts
 - `polling.timeout_duration_ms`: polling interval during degraded mode
@@ -44,3 +48,6 @@ wled:
 - `wled.controllers[]` is required
 - each controller ID must be unique
 - controller IDs must not contain `/`
+- unknown config keys are rejected
+- `mqtt.protocol` must be `mqtt` or `mqtts`
+- important duration/interval values must be greater than `0`

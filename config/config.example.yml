@@ -9,8 +9,11 @@ mqtt:
   dead_letter_suffix: dead_letter
   keep_alive_secs: 30
   reconnect_delay_secs: 5
+  reconnect_max_delay_secs: 60
 
 wled:
+  # Optional global timeout for WLED HTTP calls. If omitted, requests use reqwest default behavior.
+  # http_timeout_ms: 5000
   controllers:
     - id: living-room
       # Supports host/IP with or without scheme. Example: 192.168.1.50 or http://192.168.1.50
@@ -18,6 +21,8 @@ wled:
       interval_ms: 1000
       timeout_ms: 30000
       timeout_duration_ms: 30000
+      # Optional per-controller override for HTTP request timeout.
+      # http_timeout_ms: 5000
     - id: office
       host: 192.168.1.51
 

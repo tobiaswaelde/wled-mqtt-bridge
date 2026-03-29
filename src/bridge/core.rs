@@ -53,6 +53,7 @@ pub(super) struct ControllerRuntime {
     pub(super) wled_base: String,
     pub(super) topics: Arc<Topics>,
     pub(super) polling: PollingConfig,
+    pub(super) http_timeout_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone)]
@@ -240,10 +241,18 @@ fn collect_paths(value: &Value, parent: &str, out: &mut Vec<(String, String)>) {
     }
 }
 
-pub(super) async fn handle_http_get(http: &Client, base: &str, path: &str) -> Result<Value> {
+pub(super) async fn handle_http_get(
+    http: &Client,
+    base: &str,
+    path: &str,
+    timeout_ms: Option<u64>,
+) -> Result<Value> {
     let url = format!("{base}{path}");
-    let response = http
-        .get(&url)
+    let mut request = http.get(&url);
+    if let Some(timeout_ms) = timeout_ms {
+        request = request.timeout(std::time::Duration::from_millis(timeout_ms));
+    }
+    let response = request
         .send()
         .await
         .with_context(|| format!("GET {path} failed"))?;
@@ -264,11 +273,14 @@ pub(super) async fn handle_http_post(
     base: &str,
     path: &str,
     body: &Value,
+    timeout_ms: Option<u64>,
 ) -> Result<()> {
     let url = format!("{base}{path}");
-    let response = http
-        .post(&url)
-        .json(body)
+    let mut request = http.post(&url).json(body);
+    if let Some(timeout_ms) = timeout_ms {
+        request = request.timeout(std::time::Duration::from_millis(timeout_ms));
+    }
+    let response = request
         .send()
         .await
         .with_context(|| format!("POST {path} failed"))?;

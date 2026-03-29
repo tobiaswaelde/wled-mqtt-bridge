@@ -4,6 +4,15 @@
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-03-30
+### Added
+- Optional WLED HTTP timeout (`wled.http_timeout_ms`, per-controller override) for GET/POST requests
+
+### Changed
+- MQTT reconnect handling improved with exponential backoff and max delay (`mqtt.reconnect_max_delay_secs`)
+- MQTT command wildcard subscription is re-applied after reconnect (`ConnAck`)
+- Config parsing is now strict (`deny_unknown_fields`) and includes stronger runtime validation for reconnect/polling/timeout fields
+
 ## [2.0.0] - 2026-03-29
 ### Added
 - Docker Compose improvements (healthcheck override, log rotation, resource limits, image tag pinning support)
