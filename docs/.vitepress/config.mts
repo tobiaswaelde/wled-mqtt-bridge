@@ -41,7 +41,7 @@ const config = defineConfig({
     ],
     footer: {
       message: "Released under MIT License",
-      copyright: "Copyright 2026 WLED MQTT Bridge"
+      copyright: "Copyright 2026 Tobias Wälde (https://tobiaswaelde.com)"
     }
   }
 });
