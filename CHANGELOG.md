@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+## [2.0.6] - 2026-03-30
+### Changed
+- Cut a fresh patch release to publish updated release artifacts and Docker image tags
+- No functional application changes in this patch beyond release publication
+
 ## [2.0.5] - 2026-03-30
 ### Changed
 - Speed up Docker image publishing by excluding large local build artifacts and repository metadata from the Docker build context
