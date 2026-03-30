@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+## [2.0.7] - 2026-03-30
+### Changed
+- Publish only a native `linux/amd64` Docker image to remove the slow emulated `linux/arm64` build path
+- Simplify the Docker publish workflow to match the faster single-architecture pattern used in `modbus-mqtt-bridge`
+
 ## [2.0.6] - 2026-03-30
 ### Changed
 - Cut a fresh patch release to publish updated release artifacts and Docker image tags

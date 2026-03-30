@@ -9,26 +9,19 @@ RUN apk add --no-cache musl-dev pkgconfig openssl-dev ca-certificates
 
 WORKDIR /app
 
-ARG TARGETARCH
-
 COPY Cargo.toml .
 COPY Cargo.lock .
 COPY src ./src
 COPY config ./config
 
-# Build a fully static binary for a scratch runtime for the current target arch.
+# Build a fully static amd64 binary so the publish workflow can run natively.
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
     --mount=type=cache,target=/app/target,sharing=locked \
     set -eux; \
-    case "${TARGETARCH}" in \
-      amd64) RUST_TARGET="x86_64-unknown-linux-musl" ;; \
-      arm64) RUST_TARGET="aarch64-unknown-linux-musl" ;; \
-      *) echo "unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
-    esac; \
-    rustup target add "${RUST_TARGET}"; \
-    cargo build --release --locked --target "${RUST_TARGET}"; \
-    cp "/app/target/${RUST_TARGET}/release/wled-mqtt-bridge" /app/wled-mqtt-bridge
+    rustup target add x86_64-unknown-linux-musl; \
+    cargo build --release --locked --target x86_64-unknown-linux-musl; \
+    cp /app/target/x86_64-unknown-linux-musl/release/wled-mqtt-bridge /app/wled-mqtt-bridge
 
 ### ####################
 ### RUNNER

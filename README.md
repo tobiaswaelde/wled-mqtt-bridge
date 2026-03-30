@@ -6,7 +6,7 @@
   [![Rust CI](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/rust-ci.yml/badge.svg)](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/rust-ci.yml)
   [![Docker Build](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/test-build.yml/badge.svg)](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/test-build.yml)
   [![Docker Deploy](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/deploy.yml/badge.svg)](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/deploy.yml)
-  [![Version](https://img.shields.io/badge/version-2.0.6-blue.svg)](https://github.com/tobiaswaelde/wled-mqtt-bridge/blob/main/Cargo.toml)
+  [![Version](https://img.shields.io/badge/version-2.0.7-blue.svg)](https://github.com/tobiaswaelde/wled-mqtt-bridge/blob/main/Cargo.toml)
   [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/tobiaswaelde/wled-mqtt-bridge/blob/main/LICENSE.txt)
 
   Rust bridge between WLED controllers and MQTT topics.
@@ -43,7 +43,7 @@ Use it when you want one stable integration layer between WLED devices and syste
 - Typed config validation with startup invariants
 - Dead-letter publishing for invalid commands
 - Optional Prometheus metrics endpoint
-- Docker-ready with multi-arch images (`linux/amd64`, `linux/arm64`)
+- Docker-ready with GitHub Container Registry publishing for `linux/amd64`
 
 ## Quick start
 

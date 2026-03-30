@@ -23,7 +23,7 @@ features:
   - title: Built for Operations
     details: Includes dead-letter handling, resilient reconnect loops, optional metrics endpoint, and healthcheck mode for runtime monitoring.
   - title: Production-Ready Containers
-    details: Multi-stage Docker build with small runtime image, multi-arch publishing, and CI container smoke tests.
+    details: Multi-stage Docker build with small runtime image, GHCR publishing for linux/amd64, and CI container smoke tests.
   - title: Fast Integration
     details: Use with Home Assistant, Node-RED, or custom MQTT consumers without writing custom WLED polling glue code.
 ---
