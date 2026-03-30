@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+## [2.0.3] - 2026-03-30
+### Fixed
+- Isolate command handling per controller so one offline or timing-out controller does not block commands to other configured controllers
+
 ## [2.0.2] - 2026-03-30
 ### Changed
 - Release workflow now builds multi-arch Docker images and pushes them to GitHub Container Registry (`ghcr.io`)

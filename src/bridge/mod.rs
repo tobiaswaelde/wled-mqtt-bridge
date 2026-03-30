@@ -81,116 +81,33 @@ pub async fn run(config: AppConfig, metrics: Arc<BridgeMetrics>) -> Result<()> {
     .await
     .context("failed to publish bridge_online=true")?;
 
-    let (cmd_tx, mut cmd_rx) = mpsc::channel::<CommandMessage>(256);
-    let mqtt_for_events = mqtt.clone();
-    let reconnect_delay = config.mqtt.reconnect_delay_secs;
-    let reconnect_max_delay = config.mqtt.reconnect_max_delay_secs;
-    let base_topic = config.mqtt.base_topic.clone();
-    let publish_for_events = config.publish.clone();
-    let metrics_for_events = metrics.clone();
-    let dead_letter_for_events = dead_letter_topic.clone();
-    let cmd_wildcard_for_events = cmd_wildcard.clone();
+    let mut cmd_workers = HashMap::new();
+    for controller in controllers.iter() {
+        let (cmd_tx, mut cmd_rx) = mpsc::channel::<CommandMessage>(256);
+        cmd_workers.insert(controller.id.clone(), cmd_tx);
 
-    tokio::spawn(async move {
-        let mut reconnect_delay_secs = reconnect_delay.max(1);
-        loop {
-            match eventloop.poll().await {
-                Ok(Event::Incoming(Incoming::ConnAck(_))) => {
-                    info!("mqtt connected");
-                    metrics_for_events.inc_mqtt_connack();
-                    reconnect_delay_secs = reconnect_delay.max(1);
+        let mqtt_for_cmds = mqtt.clone();
+        let config_for_cmds = config.clone();
+        let http_for_cmds = http.clone();
+        let metrics_for_cmds = metrics.clone();
+        let dead_letter_for_cmds = dead_letter_topic.clone();
+        let controller = controller_map
+            .get(&controller.id)
+            .cloned()
+            .expect("controller runtime missing for configured controller");
 
-                    if let Err(err) = mqtt_for_events
-                        .subscribe(cmd_wildcard_for_events.clone(), rumqttc::QoS::AtMostOnce)
-                        .await
-                    {
-                        warn!(?err, "failed to re-subscribe to command wildcard topic");
-                    }
+        tokio::spawn(async move {
+            while let Some(cmd) = cmd_rx.recv().await {
+                debug!(
+                    controller_id = %cmd.controller_id,
+                    message = %cmd.payload,
+                    "received command payload"
+                );
 
-                    if let Err(err) = publish_topic(
-                        &mqtt_for_events,
-                        &publish_for_events,
-                        &metrics_for_events,
-                        TopicClass::BridgeOnline,
-                        format!("{base_topic}/bridge_online"),
-                        "true",
-                    )
-                    .await
-                    {
-                        warn!(?err, "failed to publish bridge_online=true");
-                    }
-                }
-                Ok(Event::Incoming(Incoming::Publish(packet))) => {
-                    if let Some(controller_id) = extract_controller_id(&base_topic, &packet.topic) {
-                        let payload = String::from_utf8_lossy(&packet.payload).to_string();
-                        if !payload.trim().is_empty() {
-                            let message = CommandMessage {
-                                controller_id,
-                                source_topic: packet.topic,
-                                payload,
-                            };
-                            if let Err(err) = cmd_tx.send(message).await {
-                                warn!(?err, "failed to enqueue command");
-                            }
-                        }
-                    } else if packet.topic.starts_with(&format!("{base_topic}/"))
-                        && packet.topic.ends_with("/cmd")
-                    {
-                        let payload = String::from_utf8_lossy(&packet.payload).to_string();
-                        let _ = publish_dead_letter(
-                            &mqtt_for_events,
-                            &publish_for_events,
-                            &metrics_for_events,
-                            &dead_letter_for_events,
-                            DeadLetterMessage {
-                                reason: "invalid_command_topic".to_string(),
-                                controller_id: None,
-                                source_topic: Some(packet.topic),
-                                payload: Some(payload),
-                            },
-                        )
-                        .await;
-                    }
-                }
-                Ok(Event::Outgoing(Outgoing::Disconnect)) => {
-                    warn!("mqtt disconnected");
-                }
-                Ok(_) => {}
-                Err(err) => {
-                    metrics_for_events.inc_mqtt_eventloop_error();
-                    warn!(
-                        ?err,
-                        reconnect_in_secs = reconnect_delay_secs,
-                        "mqtt eventloop error"
-                    );
-                    time::sleep(std::time::Duration::from_secs(reconnect_delay_secs)).await;
-                    reconnect_delay_secs =
-                        (reconnect_delay_secs.saturating_mul(2)).min(reconnect_max_delay.max(1));
-                }
-            }
-        }
-    });
-
-    let mqtt_for_cmds = mqtt.clone();
-    let config_for_cmds = config.clone();
-    let http_for_cmds = http.clone();
-    let controllers_for_cmds = controller_map.clone();
-    let metrics_for_cmds = metrics.clone();
-    let dead_letter_for_cmds = dead_letter_topic.clone();
-
-    tokio::spawn(async move {
-        while let Some(cmd) = cmd_rx.recv().await {
-            debug!(
-                controller_id = %cmd.controller_id,
-                message = %cmd.payload,
-                "received command payload"
-            );
-
-            if let Some(controller) = controllers_for_cmds.get(&cmd.controller_id) {
                 let result = handle_command(
                     &mqtt_for_cmds,
                     &http_for_cmds,
-                    controller,
+                    &controller,
                     &config_for_cmds,
                     &metrics_for_cmds,
                     &cmd.payload,
@@ -236,21 +153,118 @@ pub async fn run(config: AppConfig, metrics: Arc<BridgeMetrics>) -> Result<()> {
                         "failed to reset command topic"
                     );
                 }
-            } else {
-                warn!(controller_id = %cmd.controller_id, "unknown controller id in command topic");
-                let _ = publish_dead_letter(
-                    &mqtt_for_cmds,
-                    &config_for_cmds.publish,
-                    &metrics_for_cmds,
-                    &dead_letter_for_cmds,
-                    DeadLetterMessage {
-                        reason: "unknown_controller_id".to_string(),
-                        controller_id: Some(cmd.controller_id.clone()),
-                        source_topic: Some(cmd.source_topic.clone()),
-                        payload: Some(cmd.payload.clone()),
-                    },
-                )
-                .await;
+            }
+        });
+    }
+    let cmd_workers = Arc::new(cmd_workers);
+
+    let mqtt_for_events = mqtt.clone();
+    let reconnect_delay = config.mqtt.reconnect_delay_secs;
+    let reconnect_max_delay = config.mqtt.reconnect_max_delay_secs;
+    let base_topic = config.mqtt.base_topic.clone();
+    let publish_for_events = config.publish.clone();
+    let metrics_for_events = metrics.clone();
+    let dead_letter_for_events = dead_letter_topic.clone();
+    let cmd_wildcard_for_events = cmd_wildcard.clone();
+    let cmd_workers_for_events = cmd_workers.clone();
+
+    tokio::spawn(async move {
+        let mut reconnect_delay_secs = reconnect_delay.max(1);
+        loop {
+            match eventloop.poll().await {
+                Ok(Event::Incoming(Incoming::ConnAck(_))) => {
+                    info!("mqtt connected");
+                    metrics_for_events.inc_mqtt_connack();
+                    reconnect_delay_secs = reconnect_delay.max(1);
+
+                    if let Err(err) = mqtt_for_events
+                        .subscribe(cmd_wildcard_for_events.clone(), rumqttc::QoS::AtMostOnce)
+                        .await
+                    {
+                        warn!(?err, "failed to re-subscribe to command wildcard topic");
+                    }
+
+                    if let Err(err) = publish_topic(
+                        &mqtt_for_events,
+                        &publish_for_events,
+                        &metrics_for_events,
+                        TopicClass::BridgeOnline,
+                        format!("{base_topic}/bridge_online"),
+                        "true",
+                    )
+                    .await
+                    {
+                        warn!(?err, "failed to publish bridge_online=true");
+                    }
+                }
+                Ok(Event::Incoming(Incoming::Publish(packet))) => {
+                    if let Some(controller_id) = extract_controller_id(&base_topic, &packet.topic) {
+                        let payload = String::from_utf8_lossy(&packet.payload).to_string();
+                        if !payload.trim().is_empty() {
+                            let source_topic = packet.topic.clone();
+                            let message = CommandMessage {
+                                controller_id: controller_id.clone(),
+                                source_topic: source_topic.clone(),
+                                payload,
+                            };
+                            if let Some(cmd_tx) = cmd_workers_for_events.get(&controller_id) {
+                                if let Err(err) = cmd_tx.send(message).await {
+                                    warn!(controller_id = %controller_id, ?err, "failed to enqueue command");
+                                }
+                            } else {
+                                warn!(
+                                    controller_id = %controller_id,
+                                    "unknown controller id in command topic"
+                                );
+                                let _ = publish_dead_letter(
+                                    &mqtt_for_events,
+                                    &publish_for_events,
+                                    &metrics_for_events,
+                                    &dead_letter_for_events,
+                                    DeadLetterMessage {
+                                        reason: "unknown_controller_id".to_string(),
+                                        controller_id: Some(controller_id),
+                                        source_topic: Some(source_topic),
+                                        payload: Some(message.payload),
+                                    },
+                                )
+                                .await;
+                            }
+                        }
+                    } else if packet.topic.starts_with(&format!("{base_topic}/"))
+                        && packet.topic.ends_with("/cmd")
+                    {
+                        let payload = String::from_utf8_lossy(&packet.payload).to_string();
+                        let _ = publish_dead_letter(
+                            &mqtt_for_events,
+                            &publish_for_events,
+                            &metrics_for_events,
+                            &dead_letter_for_events,
+                            DeadLetterMessage {
+                                reason: "invalid_command_topic".to_string(),
+                                controller_id: None,
+                                source_topic: Some(packet.topic),
+                                payload: Some(payload),
+                            },
+                        )
+                        .await;
+                    }
+                }
+                Ok(Event::Outgoing(Outgoing::Disconnect)) => {
+                    warn!("mqtt disconnected");
+                }
+                Ok(_) => {}
+                Err(err) => {
+                    metrics_for_events.inc_mqtt_eventloop_error();
+                    warn!(
+                        ?err,
+                        reconnect_in_secs = reconnect_delay_secs,
+                        "mqtt eventloop error"
+                    );
+                    time::sleep(std::time::Duration::from_secs(reconnect_delay_secs)).await;
+                    reconnect_delay_secs =
+                        (reconnect_delay_secs.saturating_mul(2)).min(reconnect_max_delay.max(1));
+                }
             }
         }
     });
