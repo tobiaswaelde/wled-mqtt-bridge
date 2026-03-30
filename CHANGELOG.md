@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-03-30
+### Changed
+- Release workflow now builds multi-arch Docker images and pushes them to GitHub Container Registry (`ghcr.io`)
+- Release workflow now grants `packages: write` permission for GHCR publishing
+
 ## [2.0.1] - 2026-03-30
 ### Added
 - Optional WLED HTTP timeout (`wled.http_timeout_ms`, per-controller override) for GET/POST requests
