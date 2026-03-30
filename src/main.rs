@@ -70,15 +70,28 @@ async fn run_healthcheck(path: &Path) -> Result<()> {
         config.mqtt.port,
     );
     mqtt_options.set_keep_alive(std::time::Duration::from_secs(5));
+    mqtt_options.set_clean_session(true);
+
+    if config.mqtt.protocol.eq_ignore_ascii_case("mqtts") {
+        mqtt_options.set_transport(rumqttc::Transport::tls_with_default_config());
+    }
+
+    if let Some(username) = &config.mqtt.username {
+        mqtt_options.set_credentials(username, config.mqtt.password.clone().unwrap_or_default());
+    }
 
     let (_client, mut eventloop) = rumqttc::AsyncClient::new(mqtt_options, 10);
 
     tokio::time::timeout(std::time::Duration::from_secs(3), async {
         loop {
             match eventloop.poll().await {
-                Ok(rumqttc::Event::Incoming(rumqttc::Incoming::ConnAck(_))) => return Ok(()),
+                Ok(rumqttc::Event::Incoming(rumqttc::Incoming::ConnAck(_))) => {
+                    return Ok::<(), rumqttc::ConnectionError>(());
+                }
                 Ok(_) => continue,
-                Err(err) => return Err(err),
+                Err(_) => {
+                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                }
             }
         }
     })

@@ -56,10 +56,29 @@ jobs:
       - name: Start test MQTT broker
         run: |
           docker network create wled-ci
+          cat > /tmp/mosquitto-ci.conf <<'CONFIG'
+          listener 1883 0.0.0.0
+          allow_anonymous true
+          CONFIG
           docker run -d --rm \
             --name ci-mosquitto \
             --network wled-ci \
+            -v /tmp/mosquitto-ci.conf:/mosquitto/config/mosquitto.conf:ro \
             eclipse-mosquitto:2
+
+      - name: Wait for test MQTT broker
+        shell: bash
+        run: |
+          for _ in {1..30}; do
+            if docker logs ci-mosquitto 2>&1 | grep -q "Opening ipv4 listen socket on port 1883"; then
+              exit 0
+            fi
+            sleep 1
+          done
+
+          docker logs ci-mosquitto
+          echo "Mosquitto did not become ready in time" >&2
+          exit 1
 
       - name: Create smoke config
         run: |
