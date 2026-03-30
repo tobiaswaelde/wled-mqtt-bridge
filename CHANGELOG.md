@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+## [2.0.4] - 2026-03-30
+### Changed
+- Simplify release workflows by separating responsibilities: `deploy.yml` only publishes the multi-arch container image, and `release.yml` only packages binaries and creates the GitHub Release
+- Remove SBOM generation, image signing, provenance attestation, duplicate Docker publishing, and extra workflow permissions from the tag release path
+
 ## [2.0.3] - 2026-03-30
 ### Fixed
 - Isolate command handling per controller so one offline or timing-out controller does not block commands to other configured controllers
