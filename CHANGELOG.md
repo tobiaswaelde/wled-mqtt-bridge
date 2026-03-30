@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+## [2.0.8] - 2026-03-30
+### Changed
+- Correct the Docker patch release so the publish tag points to the commit that removes the slow emulated multi-architecture build
+
 ## [2.0.7] - 2026-03-30
 ### Changed
 - Publish only a native `linux/amd64` Docker image to remove the slow emulated `linux/arm64` build path
