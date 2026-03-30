@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+## [2.0.5] - 2026-03-30
+### Changed
+- Speed up Docker image publishing by excluding large local build artifacts and repository metadata from the Docker build context
+- Reuse cached Cargo dependencies and build outputs across Docker builds in GitHub Actions to reduce repeat build time
+
 ## [2.0.4] - 2026-03-30
 ### Changed
 - Simplify release workflows by separating responsibilities: `deploy.yml` only publishes the multi-arch container image, and `release.yml` only packages binaries and creates the GitHub Release

@@ -1,0 +1,10 @@
+.git
+.github
+.vscode
+target
+docs
+.DS_Store
+README.md
+compose.yml
+AGENT.md
+

@@ -47,6 +47,8 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64
+          cache-from: type=gha,scope=docker-publish
+          cache-to: type=gha,mode=max,scope=docker-publish
           tags: |
             ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}

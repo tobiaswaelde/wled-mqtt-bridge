@@ -6,7 +6,7 @@
   [![Rust CI](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/rust-ci.yml/badge.svg)](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/rust-ci.yml)
   [![Docker Build](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/test-build.yml/badge.svg)](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/test-build.yml)
   [![Docker Deploy](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/deploy.yml/badge.svg)](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/deploy.yml)
-  [![Version](https://img.shields.io/badge/version-2.0.4-blue.svg)](https://github.com/tobiaswaelde/wled-mqtt-bridge/blob/main/Cargo.toml)
+  [![Version](https://img.shields.io/badge/version-2.0.5-blue.svg)](https://github.com/tobiaswaelde/wled-mqtt-bridge/blob/main/Cargo.toml)
   [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/tobiaswaelde/wled-mqtt-bridge/blob/main/LICENSE.txt)
 
   Rust bridge between WLED controllers and MQTT topics.

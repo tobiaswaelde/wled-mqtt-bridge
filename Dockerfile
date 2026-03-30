@@ -1,3 +1,5 @@
+## syntax=docker/dockerfile:1.7
+
 ### ####################
 ### BUILDER
 ### ####################
@@ -15,7 +17,10 @@ COPY src ./src
 COPY config ./config
 
 # Build a fully static binary for a scratch runtime for the current target arch.
-RUN set -eux; \
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,target=/app/target,sharing=locked \
+    set -eux; \
     case "${TARGETARCH}" in \
       amd64) RUST_TARGET="x86_64-unknown-linux-musl" ;; \
       arm64) RUST_TARGET="aarch64-unknown-linux-musl" ;; \
