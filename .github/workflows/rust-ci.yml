@@ -67,14 +67,15 @@ jobs:
           mqtt:
             host: ci-mosquitto
             port: 1883
-            topic_prefix: wled
+            base_topic: wled
           wled:
-            timeout_ms: 2000
-            interval_ms: 5000
-            timeout_duration_ms: 30000
             controllers:
               - id: demo
                 host: 127.0.0.1
+          polling:
+            timeout_ms: 2000
+            interval_ms: 5000
+            timeout_duration_ms: 30000
           publish:
             qos:
               state: 0
