@@ -13,6 +13,6 @@ jobs:
         with: { node-version: 24, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - uses: changesets/action@v2
-        with: { version: pnpm changeset version }
+        with: { version-script: pnpm changeset version }
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
