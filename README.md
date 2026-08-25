@@ -1,4 +1,4 @@
-# WLED MQTT Bridge
+# 🌈 WLED MQTT Bridge
 
 [![CI](https://img.shields.io/github/actions/workflow/status/tobiaswaelde/wled-mqtt-bridge/ci.yml?style=for-the-badge&label=CI)](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/github/actions/workflow/status/tobiaswaelde/wled-mqtt-bridge/docs.yml?style=for-the-badge&label=Docs)](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/docs.yml)
@@ -8,7 +8,7 @@
 
 NestJS bridge between multiple WLED controllers and MQTT. Full documentation: [tobiaswaelde.github.io/wled-mqtt-bridge](https://tobiaswaelde.github.io/wled-mqtt-bridge/).
 
-## Quick start
+## 🚀 Quick start
 
 ```bash
 cp config/config.example.yml config/config.yml
@@ -48,10 +48,10 @@ Example command:
 mosquitto_pub -h mqtt.example.net -t 'home/wled/desk/cmd' -m '{"on":true,"bri":180}'
 ```
 
-## Documentation
+## 📚 Documentation
 
-- [Documentation home](https://tobiaswaelde.github.io/wled-mqtt-bridge/)
-- [Configuration](https://tobiaswaelde.github.io/wled-mqtt-bridge/configuration)
-- [MQTT contract](https://tobiaswaelde.github.io/wled-mqtt-bridge/mqtt)
-- [Authentication](https://tobiaswaelde.github.io/wled-mqtt-bridge/authentication)
-- [Docker deployment](https://tobiaswaelde.github.io/wled-mqtt-bridge/deployment)
+- [🏠 Documentation home](https://tobiaswaelde.github.io/wled-mqtt-bridge/)
+- [⚙️ Configuration](https://tobiaswaelde.github.io/wled-mqtt-bridge/configuration)
+- [📡 MQTT contract](https://tobiaswaelde.github.io/wled-mqtt-bridge/mqtt)
+- [🔐 Authentication](https://tobiaswaelde.github.io/wled-mqtt-bridge/authentication)
+- [🐳 Docker deployment](https://tobiaswaelde.github.io/wled-mqtt-bridge/deployment)
