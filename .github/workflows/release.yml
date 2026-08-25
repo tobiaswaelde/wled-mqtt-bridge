@@ -1,117 +1,14 @@
-name: Release
-
+name: Create GitHub release
 on:
   push:
-    tags:
-      - "v*"
-  workflow_dispatch:
-
-permissions:
-  contents: write
-
+    tags: ['v*']
+permissions: { contents: write }
 jobs:
-  publish:
-    if: github.event_name == 'push'
+  release:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install musl toolchain
-        run: sudo apt-get update && sudo apt-get install -y musl-tools
-
-      - name: Add musl target
-        run: rustup target add x86_64-unknown-linux-musl
-
-      - name: Build release binary (musl)
-        run: cargo build --release --target x86_64-unknown-linux-musl
-
-      - name: Extract release notes
-        shell: bash
-        run: |
-          version="${GITHUB_REF_NAME#v}"
-          notes_file="release-notes.md"
-
-          awk -v version="$version" '
-            $0 ~ "^## \\[" version "\\]" { capture = 1; next }
-            capture && $0 ~ "^## \\[" { exit }
-            capture { print }
-          ' CHANGELOG.md > "$notes_file"
-
-          if [ ! -s "$notes_file" ]; then
-            echo "No changelog entry found for ${version}" >&2
-            exit 1
-          fi
-
-      - name: Package release artifacts
-        shell: bash
-        run: |
-          version="${GITHUB_REF_NAME#v}"
-          staging="dist/wled-mqtt-bridge-${version}"
-          archive="dist/wled-mqtt-bridge-${version}-linux-musl-x86_64.tar.gz"
-
-          rm -rf dist
-          mkdir -p "$staging"
-          cp target/x86_64-unknown-linux-musl/release/wled-mqtt-bridge "$staging/"
-          cp LICENSE.txt README.md "$staging/"
-
-          tar -C dist -czf "$archive" "wled-mqtt-bridge-${version}"
-          sha256sum "$archive" > "${archive}.sha256"
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: WLED MQTT Bridge ${{ github.ref_name }}
-          tag_name: ${{ github.ref_name }}
-          body_path: release-notes.md
-          files: |
-            dist/*.tar.gz
-            dist/*.sha256
-
-  seed_changelog:
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Seed Unreleased changelog section
-        shell: bash
-        run: |
-          if grep -q '^## \[Unreleased\]' CHANGELOG.md; then
-            echo "Unreleased section already exists."
-            exit 0
-          fi
-
-          tmp="$(mktemp)"
-          awk '
-            BEGIN { inserted = 0 }
-            /^## \[/ && !inserted {
-              print "## [Unreleased]"
-              print ""
-              inserted = 1
-            }
-            { print }
-          ' CHANGELOG.md > "$tmp"
-          mv "$tmp" CHANGELOG.md
-
-      - name: Commit changelog update
-        shell: bash
-        env:
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-        run: |
-          if git diff --quiet -- CHANGELOG.md; then
-            echo "No changelog update required."
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add CHANGELOG.md
-          git commit -m "docs: seed unreleased changelog section"
-          git push origin HEAD:"$DEFAULT_BRANCH"
+      - uses: actions/checkout@v4
+      - name: Verify tag version
+        run: test "v$(node -p \"require('./package.json').version\")" = "$GITHUB_REF_NAME"
+      - uses: softprops/action-gh-release@v2
+        with: { generate_release_notes: true }

@@ -1,44 +1,18 @@
-## syntax=docker/dockerfile:1.7
-
-### ####################
-### BUILDER
-### ####################
-FROM rust:1.87-alpine AS build
-
-RUN apk add --no-cache musl-dev pkgconfig openssl-dev ca-certificates
-
+FROM node:24-bookworm-slim AS build
 WORKDIR /app
+RUN corepack enable
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
+COPY docs/package.json docs/package.json
+RUN pnpm install --frozen-lockfile=false
+COPY . .
+RUN pnpm build && rm -f dist/*.map
 
-COPY Cargo.toml .
-COPY Cargo.lock .
-COPY src ./src
-COPY config ./config
-
-# Build a fully static amd64 binary so the publish workflow can run natively.
-RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,target=/app/target,sharing=locked \
-    set -eux; \
-    rustup target add x86_64-unknown-linux-musl; \
-    cargo build --release --locked --target x86_64-unknown-linux-musl; \
-    cp /app/target/x86_64-unknown-linux-musl/release/wled-mqtt-bridge /app/wled-mqtt-bridge
-
-### ####################
-### RUNNER
-### ####################
-FROM scratch AS runtime
-
+FROM node:24-bookworm-slim
 WORKDIR /app
-
-COPY --from=build /app/wled-mqtt-bridge /app/wled-mqtt-bridge
-COPY --from=build /app/config/config.example.yml /app/config/config.example.yml
-COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-
-ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD ["/app/wled-mqtt-bridge", "--config", "/app/config/config.yml", "--healthcheck"]
-
-USER 10001:10001
-
-CMD ["/app/wled-mqtt-bridge", "--config", "/app/config/config.yml"]
+ENV NODE_ENV=production CONFIG_FILE=/app/config/config.yml
+COPY --from=build /app/dist ./dist
+COPY config/config.example.yml /app/config/config.example.yml
+RUN useradd --system --uid 10001 bridge && chown -R bridge:bridge /app
+USER bridge
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD node -e "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["node", "dist/index.js"]

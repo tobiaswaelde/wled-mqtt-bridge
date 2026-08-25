@@ -1,0 +1,55 @@
+{
+  "name": "wled-mqtt-bridge",
+  "version": "2.0.8",
+  "private": true,
+  "description": "WLED MQTT Bridge connects device APIs to MQTT.",
+  "packageManager": "pnpm@11.23.0",
+  "engines": {
+    "node": ">=24.18.0"
+  },
+  "scripts": {
+    "build": "ncc build src/main.ts -o dist --source-map --minify",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/main.ts",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit",
+    "test": "jest --config jest.config.ts --runInBand",
+    "docs:dev": "pnpm --dir docs dev",
+    "docs:build": "pnpm --dir docs build",
+    "changeset": "changeset"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.2.1",
+    "@nestjs/core": "^11.2.1",
+    "@nestjs/platform-express": "^11.2.1",
+    "axios": "^1.19.0",
+    "js-yaml": "^5.3.0",
+    "mqtt": "^5.15.2",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "zod": "^4.4.3",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@changesets/changelog-github": "^0.5.1",
+    "@eslint/js": "^10.0.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.6",
+    "@changesets/cli": "^3.0.0",
+    "@nestjs/testing": "^11.2.1",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.10.0",
+    "@types/ws": "^8.5.13",
+    "@vercel/ncc": "^0.38.4",
+    "@typescript-eslint/eslint-plugin": "^8.67.0",
+    "@typescript-eslint/parser": "^8.67.0",
+    "eslint": "^10.8.1",
+    "jest": "^30.4.2",
+    "prettier": "^3.9.6",
+    "prettier-plugin-organize-imports": "^4.3.0",
+    "ts-jest": "^29.4.12",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.67.0"
+  }
+}

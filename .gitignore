@@ -1,14 +1,10 @@
-# Rust
-/target/
-
-# docs
-/docs/.vitepress/.temp/
-/docs/.vitepress/dist/
-/docs/node_modules/
-
-# runtime config override
+node_modules
+dist
+coverage
+.env
 config/config.yml
-
-# misc
-.DS_Store
-.codex
+config/*.auth.json
+config/.*.auth.json
+docs/.vitepress/.temp
+docs/.vitepress/dist
+target

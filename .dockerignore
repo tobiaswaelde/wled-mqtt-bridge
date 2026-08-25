@@ -1,10 +1,6 @@
 .git
-.github
-.vscode
+node_modules
+dist
+coverage
+config/config.yml
 target
-docs
-.DS_Store
-README.md
-compose.yml
-AGENT.md
-

@@ -1,47 +1,16 @@
-# Deployment
+# Docker deployment
 
-## Recommended: Docker Compose
+Create a writable local configuration directory. Cloud bridges need it to persist authentication files safely.
 
-The repository includes `compose.yml` for standard operation.
-
-Start:
-
-```bash
-docker compose up -d
+```yaml
+services:
+  wled-mqtt-bridge:
+    image: ghcr.io/tobiaswaelde/wled-mqtt-bridge:latest
+    restart: unless-stopped
+    volumes:
+      - ./config:/app/config
+    ports:
+      - "3000:3000"
 ```
 
-Stop:
-
-```bash
-docker compose down
-```
-
-Restart:
-
-```bash
-docker compose restart wled-mqtt-bridge
-```
-
-## Image
-
-Default image:
-
-```text
-ghcr.io/tobiaswaelde/wled-mqtt-bridge:latest
-```
-
-For fixed rollouts, pin a version tag instead of `latest`.
-
-Example:
-
-```bash
-IMAGE_TAG=v1.0.2 docker compose up -d
-```
-
-## Runtime limits and logs
-
-`compose.yml` already includes:
-
-- container healthcheck
-- log rotation (`max-size`, `max-file`)
-- CPU and memory limits
+Run `docker compose up -d`. Compose runs the container as the local `UID:GID`, so cloud-authentication files can be written back to the mounted `config/` directory. Export those values on systems where Docker does not provide them automatically. For bridges without browser authentication, the port can be removed when health checks run inside the Docker network. Use a fixed image version in production.
