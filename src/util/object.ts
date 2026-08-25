@@ -1,16 +1,16 @@
 /**
  * Executes `objectToMap`.
- * @param value - Value of type `unknown`.
- * @param prefix - Value of type `string`.
- * @returns Result of type `Map<string, string | number | boolean>`.
+ * @param {unknown} value Value to flatten.
+ * @param {string} prefix Initial path prefix.
+ * @returns {Map<string, string | number | boolean>} Flattened MQTT-compatible values.
  */
 export function objectToMap(value: unknown, prefix = ''): Map<string, string | number | boolean> {
   const result = new Map<string, string | number | boolean>();
   /**
    * Executes this implementation.
-   * @param current - Value of type `unknown`.
-   * @param path - Value of type `string`.
-   * @returns Result of type `void`.
+   * @param {unknown} current Current value.
+   * @param {string} path Current path.
+   * @returns {void} Nothing.
    */
   const visit = (current: unknown, path: string): void => {
     if (Array.isArray(current)) {
@@ -29,8 +29,9 @@ export function objectToMap(value: unknown, prefix = ''): Map<string, string | n
 }
 /**
  * Executes `parseObject`.
- * @param value - Value of type `T`.
- * @returns Result of type `T`.
+ * @typeParam T Value type.
+ * @param {T} value Value to return.
+ * @returns {T} Unchanged value.
  */
 export function parseObject<T>(value: T): T {
   return value;

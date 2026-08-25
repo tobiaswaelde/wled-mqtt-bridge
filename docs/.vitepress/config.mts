@@ -1,11 +1,13 @@
 import { defineConfig } from 'vitepress';
 export default defineConfig({
-  title: 'Wled Mqtt Bridge',
-  description: 'MQTT bridge documentation',
+  title: 'WLED MQTT Bridge',
+  description: 'Reliable MQTT integration for WLED controllers.',
   base: '/wled-mqtt-bridge/',
   cleanUrls: true,
   lastUpdated: true,
+  head: [['link', { rel: 'icon', href: '/wled-mqtt-bridge/favicon.svg', type: 'image/svg+xml' }]],
   themeConfig: {
+    logo: '/logo.svg',
     nav: [
       { text: 'Guide', link: '/' },
       { text: 'Configuration', link: '/configuration' },

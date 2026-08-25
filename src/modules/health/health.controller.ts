@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+
 /**
  * Executes `HealthController`.
  */
@@ -6,7 +7,7 @@ import { Controller, Get } from '@nestjs/common';
 export class HealthController {
   /**
    * Executes `getHealth`.
-   * @returns Result of type `{ status: string; name: string; version: string; uptime: number; }`.
+   * @returns {{ status: string; name: string; version: string; uptime: number }} Health response.
    */
   @Get() getHealth() {
     return {

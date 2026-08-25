@@ -1,6 +1,8 @@
 # WLED MQTT Bridge
 
-[![CI](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/ci.yml) [![Docs](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/pages.yml/badge.svg)](https://tobiaswaelde.github.io/wled-mqtt-bridge/) [![Deploy](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/deploy.yml/badge.svg)](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/deploy.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/tobiaswaelde/wled-mqtt-bridge/ci.yml?style=for-the-badge&label=CI)](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/github/actions/workflow/status/tobiaswaelde/wled-mqtt-bridge/pages.yml?style=for-the-badge&label=Docs)](https://tobiaswaelde.github.io/wled-mqtt-bridge/)
+[![Deploy](https://img.shields.io/github/actions/workflow/status/tobiaswaelde/wled-mqtt-bridge/deploy.yml?style=for-the-badge&label=Deploy)](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/deploy.yml)
 
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-tobiaswaelde-FFDD00?style=for-the-badge&logo=buymeacoffee)](https://www.buymeacoffee.com/tobiaswaelde)
 
@@ -46,4 +48,10 @@ Example command:
 mosquitto_pub -h mqtt.example.net -t 'home/wled/desk/cmd' -m '{"on":true,"bri":180}'
 ```
 
-See the [configuration](https://tobiaswaelde.github.io/wled-mqtt-bridge/configuration), [MQTT contract](https://tobiaswaelde.github.io/wled-mqtt-bridge/mqtt), [authentication](https://tobiaswaelde.github.io/wled-mqtt-bridge/authentication), and [deployment guide](https://tobiaswaelde.github.io/wled-mqtt-bridge/deployment).
+## Documentation
+
+- [Documentation home](https://tobiaswaelde.github.io/wled-mqtt-bridge/)
+- [Configuration](https://tobiaswaelde.github.io/wled-mqtt-bridge/configuration)
+- [MQTT contract](https://tobiaswaelde.github.io/wled-mqtt-bridge/mqtt)
+- [Authentication](https://tobiaswaelde.github.io/wled-mqtt-bridge/authentication)
+- [Docker deployment](https://tobiaswaelde.github.io/wled-mqtt-bridge/deployment)

@@ -7,4 +7,5 @@ config/*.auth.json
 config/.*.auth.json
 docs/.vitepress/.temp
 docs/.vitepress/dist
+docs/.vitepress/cache
 target

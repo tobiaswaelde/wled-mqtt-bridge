@@ -1,16 +1,11 @@
 import { Agent } from 'node:http';
-import WebSocket, { type RawData } from 'ws';
+import type { RawData } from 'ws';
 import { HttpMqttBridge } from '~/lib/http-mqtt-bridge';
 import type { MqttBridgeClient } from '~/modules/mqtt/mqtt.service';
 import { WledConfig } from '~/types/config/wled';
 import { objectToMap } from '~/util/object';
-
-interface WledSnapshot {
-  effects?: unknown;
-  info?: Record<string, unknown>;
-  palettes?: unknown;
-  state?: Record<string, unknown>;
-}
+import { WledConnection } from './connection';
+import { parseWledCommand, toMqttPayload, type WledSnapshot } from './protocol';
 
 /**
  * Bridges a WLED device through one persistent WebSocket connection.
@@ -23,52 +18,59 @@ export class Wled extends HttpMqttBridge<WledConfig> {
   private readonly httpAgent = new Agent({ keepAlive: false });
   private commandsSubscribed = false;
   private connected = false;
-  private connectionController?: AbortController;
   private destroyed = false;
   private hasPublishedConnectionStatus = false;
-  private pingTimer?: NodeJS.Timeout;
-  private pongTimeout?: NodeJS.Timeout;
-  private reconnectTimer?: NodeJS.Timeout;
-  private socket?: WebSocket;
+  private readonly connection: WledConnection;
 
   /**
    * Creates the class instance.
-   * @param cfg - Value of type `{ id: string; enabled: boolean; topic: string; host: string; pingInterval: number; pongTimeout: number; reconnectInterval: number; }`.
-   * @param mqtt - Value of type `MqttBridgeClient`.
+   * @param {WledConfig} cfg WLED instance configuration.
+   * @param {MqttBridgeClient} mqtt MQTT client.
    */
   constructor(cfg: WledConfig, mqtt: MqttBridgeClient) {
     super(cfg, mqtt, `WLED@${cfg.host}`, `http://${cfg.host}`);
-
-    // The snapshot is intentionally a short-lived request: the WebSocket remains the only
-    // persistent WLED connection.
     this.api.defaults.httpAgent = this.httpAgent;
+    this.connection = new WledConnection(
+      {
+        host: cfg.host,
+        pingInterval: cfg.pingInterval,
+        pongTimeout: cfg.pongTimeout,
+        reconnectInterval: cfg.reconnectInterval,
+        onConnected: () => {
+          this.setConnected(true);
+          void this.getSnapshot();
+        },
+        onDisconnected: () => {
+          this.cancelRequest('snapshot');
+          this.setConnected(false);
+        },
+        onMessage: (data) => this.handleMessage(data),
+      },
+      this.logger,
+    );
   }
 
   //#region instance lifecycle
   /**
    * Executes `setup`.
-   * @returns Result of type `void`.
+   * @returns {void} Nothing.
    */
-  public setup() {
+  public setup(): void {
     this.logger.debug(`Setting up WLED instance for host: ${this.cfg.host}`);
     this.subscribeCommands();
     this.setConnected(false);
-    this.connect();
+    this.connection.connect();
   }
 
   /**
    * Executes `destroy`.
-   * @returns Result of type `void`.
+   * @returns {void} Nothing.
    */
-  public override destroy() {
+  public override destroy(): void {
     if (this.destroyed) return;
 
     this.destroyed = true;
-    this.clearReconnectTimer();
-    this.stopHeartbeat();
-    this.connectionController?.abort();
-    this.connectionController = undefined;
-    this.socket = undefined;
+    this.connection.destroy();
     this.cancelRequest('snapshot');
     this.httpAgent.destroy();
     this.setConnected(false);
@@ -77,217 +79,14 @@ export class Wled extends HttpMqttBridge<WledConfig> {
   }
   //#endregion
 
-  //#region connection
-  /**
-   * Executes `connect`.
-   * @returns Result of type `void`.
-   */
-  private connect() {
-    if (this.destroyed || this.socket) return;
-
-    this.clearReconnectTimer();
-    const controller = new AbortController();
-    const socket = new WebSocket(`ws://${this.cfg.host}/ws`);
-    /**
-     * Executes this implementation.
-     * @returns Result of type `void`.
-     */
-    /**
-     * Executes this implementation.
-     * @returns Result of type `void`.
-     */
-    const abortSocket = () => {
-      if (socket.readyState !== WebSocket.CLOSED) {
-        socket.terminate();
-      }
-    };
-
-    controller.signal.addEventListener('abort', abortSocket, { once: true });
-    this.connectionController = controller;
-    this.socket = socket;
-
-    socket.on('open', () => {
-      if (!this.isCurrentSocket(socket, controller)) return;
-
-      this.logger.log('Connected.');
-      this.setConnected(true);
-      this.startHeartbeat(socket, controller);
-      void this.getSnapshot();
-    });
-    socket.on('message', (data) => this.handleMessage(socket, controller, data));
-    socket.on('pong', () => this.handlePong(socket, controller));
-    socket.on('error', (error) => this.handleSocketError(socket, controller, error));
-    socket.on('close', () => this.handleSocketClose(socket, controller));
-  }
-
-  /**
-   * Executes `handleSocketError`.
-   * @param socket - Value of type `WebSocket`.
-   * @param controller - Value of type `AbortController`.
-   * @param error - Value of type `Error`.
-   * @returns Result of type `void`.
-   */
-  private handleSocketError(socket: WebSocket, controller: AbortController, error: Error) {
-    if (!this.isCurrentSocket(socket, controller)) return;
-
-    this.logger.warn(`Connection failed: ${error.message}`);
-    this.disconnect(socket, controller);
-  }
-
-  /**
-   * Executes `handleSocketClose`.
-   * @param socket - Value of type `WebSocket`.
-   * @param controller - Value of type `AbortController`.
-   * @returns Result of type `void`.
-   */
-  private handleSocketClose(socket: WebSocket, controller: AbortController) {
-    if (!this.isCurrentSocket(socket, controller)) return;
-
-    this.logger.warn('Disconnected.');
-    this.disconnect(socket, controller);
-  }
-
-  /**
-   * Executes `disconnect`.
-   * @param socket - Value of type `WebSocket`.
-   * @param controller - Value of type `AbortController`.
-   * @returns Result of type `void`.
-   */
-  private disconnect(socket: WebSocket, controller: AbortController) {
-    if (!this.isCurrentSocket(socket, controller)) return;
-
-    this.stopHeartbeat();
-    this.cancelRequest('snapshot');
-    this.socket = undefined;
-    this.connectionController = undefined;
-    controller.abort();
-    this.setConnected(false);
-
-    if (!this.destroyed) {
-      this.scheduleReconnect();
-    }
-  }
-
-  /**
-   * Executes `scheduleReconnect`.
-   * @returns Result of type `void`.
-   */
-  private scheduleReconnect() {
-    if (this.reconnectTimer || this.destroyed) return;
-
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = undefined;
-      this.connect();
-    }, this.cfg.reconnectInterval);
-  }
-
-  /**
-   * Executes `clearReconnectTimer`.
-   * @returns Result of type `void`.
-   */
-  private clearReconnectTimer() {
-    if (!this.reconnectTimer) return;
-
-    clearTimeout(this.reconnectTimer);
-    this.reconnectTimer = undefined;
-  }
-
-  /**
-   * Executes `startHeartbeat`.
-   * @param socket - Value of type `WebSocket`.
-   * @param controller - Value of type `AbortController`.
-   * @returns Result of type `void`.
-   */
-  private startHeartbeat(socket: WebSocket, controller: AbortController) {
-    this.stopHeartbeat();
-
-    this.pingTimer = setInterval(() => {
-      if (!this.isCurrentSocket(socket, controller)) return;
-
-      this.ping(socket, controller);
-    }, this.cfg.pingInterval);
-  }
-
-  /**
-   * Executes `ping`.
-   * @param socket - Value of type `WebSocket`.
-   * @param controller - Value of type `AbortController`.
-   * @returns Result of type `void`.
-   */
-  private ping(socket: WebSocket, controller: AbortController) {
-    if (this.pongTimeout) return;
-
-    try {
-      socket.ping();
-      this.pongTimeout = setTimeout(() => {
-        if (!this.isCurrentSocket(socket, controller)) return;
-
-        this.logger.warn('Connection timed out.');
-        this.disconnect(socket, controller);
-      }, this.cfg.pongTimeout);
-    } catch (error) {
-      this.logger.warn(`Failed to ping WLED: ${error}`);
-      this.disconnect(socket, controller);
-    }
-  }
-
-  /**
-   * Executes `stopHeartbeat`.
-   * @returns Result of type `void`.
-   */
-  private stopHeartbeat() {
-    if (this.pingTimer) {
-      clearInterval(this.pingTimer);
-      this.pingTimer = undefined;
-    }
-
-    this.clearPongTimeout();
-  }
-
-  /**
-   * Executes `clearPongTimeout`.
-   * @returns Result of type `void`.
-   */
-  private clearPongTimeout() {
-    if (!this.pongTimeout) return;
-
-    clearTimeout(this.pongTimeout);
-    this.pongTimeout = undefined;
-  }
-
-  /**
-   * Executes `handlePong`.
-   * @param socket - Value of type `WebSocket`.
-   * @param controller - Value of type `AbortController`.
-   * @returns Result of type `void`.
-   */
-  private handlePong(socket: WebSocket, controller: AbortController) {
-    if (!this.isCurrentSocket(socket, controller)) return;
-
-    this.clearPongTimeout();
-  }
-
-  /**
-   * Executes `isCurrentSocket`.
-   * @param socket - Value of type `WebSocket`.
-   * @param controller - Value of type `AbortController`.
-   * @returns Result of type `boolean`.
-   */
-  private isCurrentSocket(socket: WebSocket, controller: AbortController) {
-    return !this.destroyed && this.socket === socket && this.connectionController === controller;
-  }
-  //#endregion
-
   //#region state
   /**
    * Executes `handleMessage`.
-   * @param socket - Value of type `WebSocket`.
-   * @param controller - Value of type `AbortController`.
-   * @param data - Value of type `RawData`.
-   * @returns Result of type `void`.
+   * @param {RawData} data Raw WebSocket message.
+   * @returns {void} Nothing.
    */
-  private handleMessage(socket: WebSocket, controller: AbortController, data: RawData) {
-    if (!this.isCurrentSocket(socket, controller) || !data) return;
+  private handleMessage(data: RawData): void {
+    if (!data) return;
 
     const message = data.toString();
     if (!message) return;
@@ -303,9 +102,9 @@ export class Wled extends HttpMqttBridge<WledConfig> {
 
   /**
    * Executes `getSnapshot`.
-   * @returns Result of type `Promise<void>`.
+   * @returns {Promise<void>} Nothing after publishing the snapshot.
    */
-  private async getSnapshot() {
+  private async getSnapshot(): Promise<void> {
     const controller = this.startRequest('snapshot');
 
     try {
@@ -329,23 +128,23 @@ export class Wled extends HttpMqttBridge<WledConfig> {
 
   /**
    * Executes `publishObject`.
-   * @param prefix - Value of type `string`.
-   * @param data - Value of type `Record<string, unknown>`.
-   * @returns Result of type `void`.
+   * @param {string} prefix MQTT topic prefix.
+   * @param {Record<string, unknown>} data WLED data object.
+   * @returns {void} Nothing.
    */
-  private publishObject(prefix: string, data: Record<string, unknown>) {
+  private publishObject(prefix: string, data: Record<string, unknown>): void {
     for (const [path, value] of objectToMap(data)) {
       const topic = [this.cfg.topic, prefix, path].filter(Boolean).join('/');
-      this.mqtt.publish(topic, typeof value === 'string' ? value : JSON.stringify(value));
+      this.mqtt.publish(topic, toMqttPayload(value));
     }
   }
 
   /**
    * Executes `setConnected`.
-   * @param connected - Value of type `boolean`.
-   * @returns Result of type `void`.
+   * @param {boolean} connected Connection state.
+   * @returns {void} Nothing.
    */
-  private setConnected(connected: boolean) {
+  private setConnected(connected: boolean): void {
     if (this.hasPublishedConnectionStatus && this.connected === connected) return;
 
     this.connected = connected;
@@ -357,9 +156,9 @@ export class Wled extends HttpMqttBridge<WledConfig> {
   //#region commands
   /**
    * Executes `subscribeCommands`.
-   * @returns Result of type `void`.
+   * @returns {void} Nothing.
    */
-  private subscribeCommands() {
+  private subscribeCommands(): void {
     if (this.commandsSubscribed) return;
 
     const commandTopic = `${this.cfg.topic}/cmd`;
@@ -374,23 +173,13 @@ export class Wled extends HttpMqttBridge<WledConfig> {
 
   /**
    * Executes `sendCommand`.
-   * @param command - Value of type `string`.
-   * @returns Result of type `void`.
+   * @param {string} command JSON command payload.
+   * @returns {void} Nothing.
    */
-  private sendCommand(command: string) {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-      this.logger.warn('Ignoring command because WLED is disconnected.');
-      return;
-    }
-
+  private sendCommand(command: string): void {
     try {
-      const value = JSON.parse(command);
-      if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-        throw new Error('A WLED command must be a JSON object.');
-      }
-
       // `v` makes WLED return the resulting state immediately, avoiding a polling round-trip.
-      this.socket.send(JSON.stringify({ ...value, v: true }));
+      this.connection.send(JSON.stringify({ ...parseWledCommand(command), v: true }));
     } catch (error) {
       this.logger.error('Error sending command to WLED.', error);
     }

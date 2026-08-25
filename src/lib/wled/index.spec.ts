@@ -25,7 +25,7 @@ class MockWebSocket {
 
   /**
    * Creates the class instance.
-   * @param url - Value of type `string`.
+   * @param {string} url WebSocket URL.
    */
   constructor(public readonly url: string) {
     MockWebSocket.instances.push(this);
@@ -38,9 +38,9 @@ class MockWebSocket {
 
   /**
    * Executes `emit`.
-   * @param event - Value of type `string`.
-   * @param args - Value of type `unknown[]`.
-   * @returns Result of type `void`.
+   * @param {string} event Event name.
+   * @param {unknown[]} args Event arguments.
+   * @returns {void} Nothing.
    */
   public emit(event: string, ...args: unknown[]) {
     this.handlers.get(event)?.(...args);
@@ -164,12 +164,107 @@ describe('Wled', () => {
     expect(signal.aborted).toBe(true);
     expect(socket.terminate).toHaveBeenCalledTimes(1);
   });
+
+  it('publishes the complete HTTP snapshot and ignores a failed or aborted snapshot', async () => {
+    mockAxiosGet.mockResolvedValue({
+      data: {
+        effects: ['Solid'],
+        info: { name: 'Desk' },
+        palettes: ['Default'],
+        state: { on: true },
+      },
+    });
+    const wled = createWled();
+    wled.setup();
+
+    const socket = MockWebSocket.instances[0];
+    socket.readyState = MockWebSocket.OPEN;
+    socket.emit('open');
+    await Promise.resolve();
+
+    expect(mockMqttPublish).toHaveBeenCalledWith('wled/test/state/on', 'true');
+    expect(mockMqttPublish).toHaveBeenCalledWith('wled/test/info/name', 'Desk');
+    expect(mockMqttPublish).toHaveBeenCalledWith('wled/test/effects', '["Solid"]');
+    expect(mockMqttPublish).toHaveBeenCalledWith('wled/test/palettes', '["Default"]');
+
+    mockAxiosGet.mockRejectedValueOnce(new Error('offline'));
+    socket.emit('close');
+    jest.advanceTimersByTime(15_000);
+    wled.destroy();
+  });
+
+  it('reports a non-aborted snapshot failure', async () => {
+    mockAxiosGet.mockRejectedValueOnce(new Error('offline'));
+    const wled = createWled();
+    wled.setup();
+    const socket = MockWebSocket.instances[0];
+    socket.readyState = MockWebSocket.OPEN;
+    socket.emit('open');
+    await Promise.resolve();
+
+    expect(mockAxiosGet).toHaveBeenCalledTimes(1);
+    wled.destroy();
+  });
+
+  it('ignores invalid messages and safely clears invalid, scalar, and disconnected commands', () => {
+    const wled = createWled();
+    wled.setup();
+
+    const socket = MockWebSocket.instances[0];
+    const handleCommand = mockMqttSubscribe.mock.calls[0][1] as (topic: string, payload: string) => void;
+    handleCommand('wled/test/cmd', '{"on":false}');
+    handleCommand('wled/test/cmd', '[]');
+    handleCommand('wled/test/cmd', 'not-json');
+    handleCommand('wled/test/cmd', '');
+    socket.emit('message', Buffer.from('not-json'));
+    socket.emit('message', '');
+    socket.emit('message', Buffer.alloc(0));
+
+    expect(socket.send).not.toHaveBeenCalled();
+    expect(mockMqttPublish).toHaveBeenCalledWith('wled/test/cmd', null);
+
+    wled.destroy();
+  });
+
+  it('contains WebSocket send failures and makes destroy idempotent', () => {
+    const wled = createWled();
+    wled.setup();
+    const socket = MockWebSocket.instances[0];
+    socket.readyState = MockWebSocket.OPEN;
+    socket.emit('open');
+    socket.send.mockImplementationOnce(() => {
+      throw new Error('send failed');
+    });
+
+    const handleCommand = mockMqttSubscribe.mock.calls[0][1] as (topic: string, payload: string) => void;
+    handleCommand('wled/test/cmd', '{"on":false}');
+    wled.destroy();
+    wled.destroy();
+
+    expect(socket.terminate).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not publish omitted snapshot sections or duplicate command subscriptions', async () => {
+    mockAxiosGet.mockResolvedValueOnce({ data: {} });
+    const wled = createWled();
+    wled.setup();
+    wled.setup();
+    const socket = MockWebSocket.instances[0];
+    socket.readyState = MockWebSocket.OPEN;
+    socket.emit('open');
+    await Promise.resolve();
+
+    expect(mockMqttSubscribe).toHaveBeenCalledTimes(1);
+    expect(mockMqttPublish).not.toHaveBeenCalledWith('wled/test/effects', expect.anything());
+    expect(mockMqttPublish).not.toHaveBeenCalledWith('wled/test/palettes', expect.anything());
+    wled.destroy();
+  });
 });
 
 /**
  * Executes `createWled`.
- * @param overrides - Value of type `Partial<{ pingInterval: number; pongTimeout: number; reconnectInterval: number; }>`.
- * @returns Result of type `Wled`.
+ * @param {Partial<{ pingInterval: number; pongTimeout: number; reconnectInterval: number }>} overrides Timing overrides.
+ * @returns {Wled} WLED bridge.
  */
 function createWled(overrides: Partial<{ pingInterval: number; pongTimeout: number; reconnectInterval: number }> = {}) {
   return new Wled(

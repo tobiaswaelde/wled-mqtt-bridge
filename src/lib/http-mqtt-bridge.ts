@@ -1,14 +1,16 @@
 import { Logger } from '@nestjs/common';
 import axios, { type AxiosInstance } from 'axios';
 import type { MqttBridgeClient, MqttMessageHandler } from '~/modules/mqtt/mqtt.service';
+
 export interface BridgeInstance {
   setup(): void;
   loop(time: number): void;
   destroy(): void;
 }
+
 /**
  * Executes `HttpMqttBridge`.
- * @typeParam T - Generic type parameter `T`.
+ * @typeParam T Configuration object type.
  */
 export abstract class HttpMqttBridge<T extends object> implements BridgeInstance {
   protected readonly api: AxiosInstance;
@@ -16,12 +18,13 @@ export abstract class HttpMqttBridge<T extends object> implements BridgeInstance
   private readonly requests = new Map<string, AbortController>();
   private readonly unsubscribers = new Set<() => void>();
   private readonly tasks = new Map<string, { interval: number; last: number; task: () => void | Promise<void> }>();
+
   /**
    * Creates the class instance.
-   * @param cfg - Value of type `T`.
-   * @param mqtt - Value of type `MqttBridgeClient`.
-   * @param scope - Value of type `string`.
-   * @param baseURL - Value of type `string`.
+   * @param {T} cfg Instance configuration.
+   * @param {MqttBridgeClient} mqtt MQTT client.
+   * @param {string} scope Logger scope.
+   * @param {string} baseURL HTTP API base URL.
    */
   protected constructor(
     protected readonly cfg: T,
@@ -32,16 +35,19 @@ export abstract class HttpMqttBridge<T extends object> implements BridgeInstance
     this.logger = new Logger(scope);
     this.api = axios.create({ baseURL });
   }
+
   /**
    * Executes `setup`.
-   * @returns Result of type `void`.
+   * @returns {void} Nothing.
    */
   abstract setup(): void;
+
   /**
    * Executes `loop`.
-   * @param time - Value of type `number`.
-   * @returns Result of type `void`.
+   * @param {number} time Current timestamp in milliseconds.
+   * @returns {void} Nothing.
    */
+
   loop(time: number) {
     for (const task of this.tasks.values())
       if (time - task.last >= task.interval) {
@@ -49,9 +55,10 @@ export abstract class HttpMqttBridge<T extends object> implements BridgeInstance
         void task.task();
       }
   }
+
   /**
    * Executes `destroy`.
-   * @returns Result of type `void`.
+   * @returns {void} Nothing.
    */
   destroy() {
     for (const unsubscribe of this.unsubscribers) unsubscribe();
@@ -60,31 +67,34 @@ export abstract class HttpMqttBridge<T extends object> implements BridgeInstance
     this.requests.clear();
     this.tasks.clear();
   }
+
   /**
    * Executes `subscribe`.
-   * @param topic - Value of type `string`.
-   * @param handler - Value of type `MqttMessageHandler`.
-   * @returns Result of type `() => void`.
+   * @param {string} topic MQTT topic filter.
+   * @param {MqttMessageHandler} handler MQTT message handler.
+   * @returns {() => void} Unsubscribe callback.
    */
   protected subscribe(topic: string, handler: MqttMessageHandler) {
     const unsubscribe = this.mqtt.subscribe(topic, handler);
     this.unsubscribers.add(unsubscribe);
     return unsubscribe;
   }
+
   /**
    * Executes `poll`.
-   * @param key - Value of type `string`.
-   * @param interval - Value of type `number`.
-   * @param task - Value of type `() => void | Promise<void>`.
-   * @returns Result of type `void`.
+   * @param {string} key Unique poll task key.
+   * @param {number} interval Poll interval in milliseconds.
+   * @param {() => void | Promise<void>} task Poll task.
+   * @returns {void} Nothing.
    */
   protected poll(key: string, interval: number, task: () => void | Promise<void>) {
     this.tasks.set(key, { interval, last: 0, task });
   }
+
   /**
    * Executes `startRequest`.
-   * @param key - Value of type `string`.
-   * @returns Result of type `AbortController`.
+   * @param {string} key Unique request key.
+   * @returns {AbortController} Controller for the new request.
    */
   protected startRequest(key: string) {
     this.requests.get(key)?.abort();
@@ -92,19 +102,21 @@ export abstract class HttpMqttBridge<T extends object> implements BridgeInstance
     this.requests.set(key, controller);
     return controller;
   }
+
   /**
    * Executes `finishRequest`.
-   * @param key - Value of type `string`.
-   * @param controller - Value of type `AbortController`.
-   * @returns Result of type `void`.
+   * @param {string} key Unique request key.
+   * @param {AbortController} controller Request controller.
+   * @returns {void} Nothing.
    */
   protected finishRequest(key: string, controller: AbortController) {
     if (this.requests.get(key) === controller) this.requests.delete(key);
   }
+
   /**
    * Executes `cancelRequest`.
-   * @param key - Value of type `string`.
-   * @returns Result of type `void`.
+   * @param {string} key Unique request key.
+   * @returns {void} Nothing.
    */
   protected cancelRequest(key: string) {
     this.requests.get(key)?.abort();

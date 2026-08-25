@@ -4,6 +4,7 @@ import { CONFIG } from '~/config/config';
 import { resolveMqttClientId } from './client-id';
 
 export type MqttMessageHandler = (topic: string, payload: string) => void;
+
 export interface MqttBridgeClient {
   publish(topic: string, payload: string | number | boolean | null): void;
   subscribe(topic: string, handler: MqttMessageHandler): () => void;
@@ -17,6 +18,7 @@ export class MqttService implements MqttBridgeClient, OnModuleDestroy {
   private readonly logger = new Logger(MqttService.name);
   private readonly client: MqttClient;
   private readonly subscriptions = new Map<string, Set<MqttMessageHandler>>();
+
   /**
    * Creates the class instance.
    */
@@ -37,11 +39,12 @@ export class MqttService implements MqttBridgeClient, OnModuleDestroy {
     this.client.on('error', (error) => this.logger.error('MQTT connection failed', error));
     this.client.on('message', (topic, payload) => this.dispatch(topic, payload.toString()));
   }
+
   /**
    * Executes `publish`.
-   * @param topic - Value of type `string`.
-   * @param payload - Value of type `string | number | boolean | null`.
-   * @returns Result of type `void`.
+   * @param {string} topic MQTT topic.
+   * @param {string | number | boolean | null} payload MQTT payload.
+   * @returns {void} Nothing.
    */
   publish(topic: string, payload: string | number | boolean | null) {
     this.client.publish(
@@ -51,11 +54,12 @@ export class MqttService implements MqttBridgeClient, OnModuleDestroy {
       (error) => error && this.logger.error(`Failed to publish ${topic}`, error),
     );
   }
+
   /**
    * Executes `subscribe`.
-   * @param filter - Value of type `string`.
-   * @param handler - Value of type `MqttMessageHandler`.
-   * @returns Result of type `() => void`.
+   * @param {string} filter MQTT topic filter.
+   * @param {MqttMessageHandler} handler MQTT message handler.
+   * @returns {() => void} Unsubscribe callback.
    */
   subscribe(filter: string, handler: MqttMessageHandler) {
     let handlers = this.subscriptions.get(filter);
@@ -74,9 +78,10 @@ export class MqttService implements MqttBridgeClient, OnModuleDestroy {
       this.client.unsubscribe(filter);
     };
   }
+
   /**
    * Executes `onModuleDestroy`.
-   * @returns Result of type `void`.
+   * @returns {void} Nothing.
    */
   onModuleDestroy() {
     this.subscriptions.clear();
@@ -84,9 +89,9 @@ export class MqttService implements MqttBridgeClient, OnModuleDestroy {
   }
   /**
    * Executes `dispatch`.
-   * @param topic - Value of type `string`.
-   * @param payload - Value of type `string`.
-   * @returns Result of type `void`.
+   * @param {string} topic MQTT topic.
+   * @param {string} payload MQTT payload.
+   * @returns {void} Nothing.
    */
   private dispatch(topic: string, payload: string) {
     for (const [filter, handlers] of this.subscriptions)
@@ -99,11 +104,12 @@ export class MqttService implements MqttBridgeClient, OnModuleDestroy {
           }
   }
 }
+
 /**
  * Executes `matches`.
- * @param filter - Value of type `string`.
- * @param topic - Value of type `string`.
- * @returns Result of type `boolean`.
+ * @param {string} filter MQTT topic filter.
+ * @param {string} topic MQTT topic.
+ * @returns {boolean} Whether the topic matches the filter.
  */
 function matches(filter: string, topic: string) {
   const a = filter.split('/'),
