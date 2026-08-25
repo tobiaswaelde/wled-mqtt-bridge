@@ -7,7 +7,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Verify tag version
         run: test "v$(node -p \"require('./package.json').version\")" = "$GITHUB_REF_NAME"
       - uses: softprops/action-gh-release@v3
