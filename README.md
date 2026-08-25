@@ -1,7 +1,7 @@
 # WLED MQTT Bridge
 
 [![CI](https://img.shields.io/github/actions/workflow/status/tobiaswaelde/wled-mqtt-bridge/ci.yml?style=for-the-badge&label=CI)](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/ci.yml)
-[![Docs](https://img.shields.io/github/actions/workflow/status/tobiaswaelde/wled-mqtt-bridge/pages.yml?style=for-the-badge&label=Docs)](https://tobiaswaelde.github.io/wled-mqtt-bridge/)
+[![Docs](https://img.shields.io/github/actions/workflow/status/tobiaswaelde/wled-mqtt-bridge/docs.yml?style=for-the-badge&label=Docs)](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/docs.yml)
 [![Deploy](https://img.shields.io/github/actions/workflow/status/tobiaswaelde/wled-mqtt-bridge/deploy.yml?style=for-the-badge&label=Deploy)](https://github.com/tobiaswaelde/wled-mqtt-bridge/actions/workflows/deploy.yml)
 
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-tobiaswaelde-FFDD00?style=for-the-badge&logo=buymeacoffee)](https://www.buymeacoffee.com/tobiaswaelde)

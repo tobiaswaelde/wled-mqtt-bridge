@@ -1,11 +1,9 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
     "rootDir": "./src",
-    "ignoreDeprecations": "6.0",
     "target": "ES2023",
-    "module": "CommonJS",
-    "moduleResolution": "Node",
+    "module": "Preserve",
+    "moduleResolution": "Bundler",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "strict": true,
@@ -17,7 +15,7 @@
     ],
     "paths": {
       "~/*": [
-        "src/*"
+        "./src/*"
       ]
     }
   },
