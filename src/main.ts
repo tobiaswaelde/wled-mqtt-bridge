@@ -13,4 +13,4 @@ export async function bootstrap(): Promise<void> {
 }
 
 /* istanbul ignore next -- executing this line would start an HTTP server in the test process. */
-if (require.main === module) void bootstrap();
+if (require.main === module || process.env.NODE_ENV === 'production') void bootstrap();
