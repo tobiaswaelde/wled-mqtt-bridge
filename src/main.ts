@@ -3,12 +3,12 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import 'reflect-metadata';
 import { ENV } from '~/config/env';
+import { AppModule } from './app.module';
 
 const logger = new Logger('APP');
 
 /** Starts the HTTP API and the configured bridge instances. */
 export async function bootstrap(): Promise<void> {
-  const { AppModule } = await import('./app.module');
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // configuration
