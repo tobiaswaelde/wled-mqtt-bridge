@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.1
+
+### Patch Changes
+
+- [`97dd5bc`](https://github.com/tobiaswaelde/wled-mqtt-bridge/commit/97dd5bc0471fb99f6ea78d5a7002089432ffb4dd) Thanks [@tobiaswaelde](https://github.com/tobiaswaelde)! - Standardize configuration loading, formatting, and CI smoke testing.
+
 ## 3.0.0
 
 ### Major Changes
