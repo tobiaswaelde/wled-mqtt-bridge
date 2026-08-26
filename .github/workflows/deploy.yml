@@ -2,6 +2,12 @@ name: Publish Docker image
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Version tag to publish
+        required: true
+        type: string
   workflow_call:
     inputs:
       tag:
@@ -14,10 +20,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event_name == 'workflow_call' && inputs.tag || github.ref }}
+          ref: ${{ inputs.tag || github.ref }}
       - name: Verify tag version
         env:
-          TAG: ${{ github.event_name == 'workflow_call' && inputs.tag || github.ref_name }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           VERSION="$(node -p 'require("./package.json").version')"
           test "v${VERSION}" = "${TAG}"
@@ -32,7 +38,7 @@ jobs:
           images: ghcr.io/${{ github.repository }}
           tags: |-
             type=raw,value=latest
-            type=raw,value=${{ github.event_name == 'workflow_call' && inputs.tag || github.ref_name }}
+            type=raw,value=${{ inputs.tag || github.ref_name }}
       - uses: docker/build-push-action@v7
         with:
           context: .
