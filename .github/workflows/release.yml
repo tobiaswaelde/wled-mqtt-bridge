@@ -2,15 +2,26 @@ name: Create GitHub release
 on:
   push:
     tags: ['v*']
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
 permissions: { contents: write }
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'workflow_call' && inputs.tag || github.ref }}
       - name: Verify tag version
+        env:
+          TAG: ${{ github.event_name == 'workflow_call' && inputs.tag || github.ref_name }}
         run: |
           VERSION="$(node -p 'require("./package.json").version')"
-          test "v${VERSION}" = "${GITHUB_REF_NAME}"
+          test "v${VERSION}" = "${TAG}"
       - uses: softprops/action-gh-release@v3
-        with: { generate_release_notes: true }
+        with:
+          tag_name: ${{ github.event_name == 'workflow_call' && inputs.tag || github.ref_name }}
+          generate_release_notes: true

@@ -16,3 +16,52 @@ jobs:
         with: { version-script: pnpm changeset version }
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  tag-release:
+    name: Tag merged version
+    needs: release-pr
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+    outputs:
+      created: ${{ steps.tag.outputs.created }}
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with: { fetch-depth: 2 }
+      - id: tag
+        name: Create version tag when package version changed
+        shell: bash
+        run: |
+          if git diff --quiet HEAD^ HEAD -- package.json; then
+            echo 'created=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          TAG="v$(node -p 'require("./package.json").version')"
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}"; then
+            echo 'created=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag --annotate "$TAG" --message "Release ${TAG}"
+          git push origin "refs/tags/${TAG}"
+          echo 'created=true' >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+  create-release:
+    needs: tag-release
+    if: needs.tag-release.outputs.created == 'true'
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.tag-release.outputs.tag }}
+    permissions: { contents: write }
+
+  deploy:
+    needs: tag-release
+    if: needs.tag-release.outputs.created == 'true'
+    uses: ./.github/workflows/deploy.yml
+    with:
+      tag: ${{ needs.tag-release.outputs.tag }}
+    permissions: { contents: read, packages: write }
