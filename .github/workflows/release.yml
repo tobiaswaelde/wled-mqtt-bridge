@@ -9,6 +9,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Verify tag version
-        run: test "v$(node -p \"require('./package.json').version\")" = "$GITHUB_REF_NAME"
+        run: |
+          VERSION="$(node -p 'require("./package.json").version')"
+          test "v${VERSION}" = "${GITHUB_REF_NAME}"
       - uses: softprops/action-gh-release@v3
         with: { generate_release_notes: true }
