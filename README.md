@@ -24,10 +24,6 @@ mqtt:
   clientId: wled-mqtt-bridge
   username: mqtt-user
   password: change-me
-http:
-  port: 3000
-logging:
-  level: log
 instances:
   - id: desk
     topic: home/wled/desk

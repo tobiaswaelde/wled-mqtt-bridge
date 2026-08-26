@@ -46,7 +46,7 @@ USER bridge
 # Health check
 # -----------------------------------------------------------------------------
 
-# Node provides fetch natively; probe Nest's local liveness endpoint on the default HTTP port.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD node -e "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+# Node provides fetch natively; probe Nest's local liveness endpoint on the configured HTTP port.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT ?? '3000') + '/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "dist/index.js"]

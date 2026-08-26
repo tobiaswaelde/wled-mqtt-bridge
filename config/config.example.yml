@@ -3,10 +3,6 @@ mqtt:
   clientId: '' # Leave empty to generate a UUID at startup.
   username: mqtt-user
   password: change-me
-http:
-  port: 3000
-logging:
-  level: log
 instances:
   - id: desk
     topic: home/wled/desk

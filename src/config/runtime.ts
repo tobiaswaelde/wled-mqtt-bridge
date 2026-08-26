@@ -23,12 +23,6 @@ export const commonSchema = z.object({
     keepAliveSeconds: z.number().int().positive().default(30),
     reconnectDelayMs: z.number().int().positive().default(5000),
   }),
-  http: z
-    .object({ host: z.string().default('0.0.0.0'), port: z.number().int().positive().default(3000) })
-    .default({ host: '0.0.0.0', port: 3000 }),
-  logging: z
-    .object({ level: z.enum(['error', 'warn', 'log', 'debug', 'verbose']).default('log') })
-    .default({ level: 'log' }),
 });
 
 /**

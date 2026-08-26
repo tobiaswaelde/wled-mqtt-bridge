@@ -16,7 +16,7 @@ jobs:
       - name: Smoke-test health endpoint
         run: |
           cp config/config.example.yml /tmp/config.yml
-          docker run -d --name bridge-ci -p 3000:3000 -v /tmp/config.yml:/app/config/config.yml:ro wled-mqtt-bridge:ci
+          docker run -d --name bridge-ci -e PORT=3000 -p 3000:3000 -v /tmp/config.yml:/app/config/config.yml:ro wled-mqtt-bridge:ci
           for _ in {1..20}; do curl --fail --silent http://127.0.0.1:3000/health && exit 0; sleep 1; done
           docker logs bridge-ci
           exit 1

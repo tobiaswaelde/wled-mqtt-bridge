@@ -1,15 +1,25 @@
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import 'reflect-metadata';
-/**
- * Creates and starts the Nest HTTP application.
- * @returns {Promise<void>} Nothing after the HTTP server starts.
- */
+import { ENV } from '~/config/env';
+
+const logger = new Logger('APP');
+
+/** Starts the HTTP API and the configured bridge instances. */
 export async function bootstrap(): Promise<void> {
-  const { CONFIG } = await import('./config/config');
   const { AppModule } = await import('./app.module');
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // configuration
   app.enableShutdownHooks();
-  await app.listen(CONFIG.http.port, CONFIG.http.host);
+
+  // middlewares
+  app.enableCors({ allowedHeaders: ['*'], origin: ENV.CORS_ORIGIN });
+
+  // start app
+  await app.listen(ENV.PORT, ENV.HOST);
+  logger.log(`Application is running on ${await app.getUrl()}`);
 }
 
 /* istanbul ignore next -- executing this line would start an HTTP server in the test process. */

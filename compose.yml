@@ -2,8 +2,12 @@ services:
   wled-mqtt-bridge:
     image: ghcr.io/tobiaswaelde/wled-mqtt-bridge:${IMAGE_TAG:-latest}
     restart: unless-stopped
-    user: "${UID:-1000}:${GID:-1000}"
+    user: '${UID:-1000}:${GID:-1000}'
+    environment:
+      CORS_ORIGIN: '${CORS_ORIGIN:-*}'
+      HOST: '${HOST:-0.0.0.0}'
+      PORT: '${PORT:-3000}'
     volumes:
       - ./config:/app/config
     ports:
-      - "3000:3000"
+      - '${PORT:-3000}:${PORT:-3000}'

@@ -12,6 +12,11 @@ export default [
     rules: {
       ...prettierConfig.rules,
       'prettier/prettier': 'error',
+      'padding-line-between-statements': [
+        'error',
+        { blankLine: 'always', prev: 'import', next: ['export', 'class', 'function'] },
+        { blankLine: 'always', prev: ['export', 'class', 'function'], next: ['export', 'class', 'function'] },
+      ],
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
       '@typescript-eslint/no-explicit-any': 'off',

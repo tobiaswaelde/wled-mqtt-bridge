@@ -30,4 +30,5 @@ function unique(instances: { id: string; topic: string }[], ctx: z.RefinementCtx
 }
 
 export type WledConfig = z.infer<typeof configSchema>['instances'][number];
+
 export const CONFIG = loadConfig(configSchema);

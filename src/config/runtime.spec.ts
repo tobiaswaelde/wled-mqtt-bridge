@@ -14,11 +14,11 @@ describe('configuration contract', () => {
   });
 
   it('applies common defaults', () => {
-    expect(commonSchema.parse({ mqtt: { host: 'localhost', clientId: 'bridge' } })).toMatchObject({
-      http: { port: 3000 },
-      logging: { level: 'log' },
-      mqtt: { port: 1883 },
-    });
+    const config = commonSchema.parse({ mqtt: { host: 'localhost', clientId: 'bridge' }, http: { port: 1234 } });
+
+    expect(config).toMatchObject({ mqtt: { port: 1883 } });
+    expect(config).not.toHaveProperty('http');
+    expect(config).not.toHaveProperty('logging');
   });
   it('accepts an empty MQTT client ID', () => {
     expect(commonSchema.parse({ mqtt: { host: 'localhost', clientId: '' } }).mqtt.clientId).toBe('');

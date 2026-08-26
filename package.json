@@ -23,6 +23,8 @@
     "@nestjs/core": "^11.2.1",
     "@nestjs/platform-express": "^11.2.1",
     "axios": "^1.19.0",
+    "dotenv": "^17.4.2",
+    "envalid": "^8.2.0",
     "js-yaml": "^5.3.0",
     "mqtt": "^5.15.2",
     "reflect-metadata": "^0.2.2",
