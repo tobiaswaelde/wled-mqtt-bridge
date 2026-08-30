@@ -1,6 +1,6 @@
 # MQTT contract
 
-Each controller keeps one persistent WebSocket and publishes `<topic>/connected`, `json`, flattened `state/... ` and `info/... `, plus `effects` and `palettes`.
+Each controller keeps one persistent WebSocket and publishes `<topic>/connected`, `json`, flattened `state/... ` and `info/... `, plus `effects` and `palettes`. The complete WLED segment array is additionally published as JSON to `<topic>/state/seg`.
 
 Publish a WLED JSON state object to `<topic>/cmd`:
 

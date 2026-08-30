@@ -133,6 +133,11 @@ export class Wled extends HttpMqttBridge<WledConfig> {
    * @returns {void} Nothing.
    */
   private publishObject(prefix: string, data: Record<string, unknown>): void {
+    const state = prefix === 'state' ? data : data.state;
+    if (isRecord(state) && Array.isArray(state.seg)) {
+      this.mqtt.publish(`${this.cfg.topic}/state/seg`, JSON.stringify(state.seg));
+    }
+
     for (const [path, value] of objectToMap(data)) {
       const topic = [this.cfg.topic, prefix, path].filter(Boolean).join('/');
       this.mqtt.publish(topic, toMqttPayload(value));
@@ -185,4 +190,13 @@ export class Wled extends HttpMqttBridge<WledConfig> {
     }
   }
   //#endregion
+}
+
+/**
+ * Determines whether a value is a JSON object.
+ * @param {unknown} value Value to inspect.
+ * @returns {value is Record<string, unknown>} Whether the value is a JSON object.
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }

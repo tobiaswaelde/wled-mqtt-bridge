@@ -86,14 +86,19 @@ describe('Wled', () => {
     const socket = MockWebSocket.instances[0];
     socket.readyState = MockWebSocket.OPEN;
     socket.emit('open');
-    socket.emit('message', Buffer.from('{"state":{"on":true,"bri":128},"info":{"name":"Desk"}}'));
+    socket.emit(
+      'message',
+      Buffer.from('{"state":{"on":true,"bri":128,"seg":[{"id":0,"col":[255,0,0]}]},"info":{"name":"Desk"}}'),
+    );
 
     expect(mockMqttPublish).toHaveBeenCalledWith('wled/test/connected', true);
     expect(mockMqttPublish).toHaveBeenCalledWith(
       'wled/test/json',
-      '{"state":{"on":true,"bri":128},"info":{"name":"Desk"}}',
+      '{"state":{"on":true,"bri":128,"seg":[{"id":0,"col":[255,0,0]}]},"info":{"name":"Desk"}}',
     );
     expect(mockMqttPublish).toHaveBeenCalledWith('wled/test/state/on', 'true');
+    expect(mockMqttPublish).toHaveBeenCalledWith('wled/test/state/seg', '[{"id":0,"col":[255,0,0]}]');
+    expect(mockMqttPublish).toHaveBeenCalledWith('wled/test/state/seg/0/id', '0');
     expect(mockMqttPublish).toHaveBeenCalledWith('wled/test/info/name', 'Desk');
 
     const handleCommand = mockMqttSubscribe.mock.calls[0][1] as (topic: string, payload: string) => void;
@@ -171,7 +176,7 @@ describe('Wled', () => {
         effects: ['Solid'],
         info: { name: 'Desk' },
         palettes: ['Default'],
-        state: { on: true },
+        state: { on: true, seg: [{ id: 0 }] },
       },
     });
     const wled = createWled();
@@ -183,6 +188,7 @@ describe('Wled', () => {
     await Promise.resolve();
 
     expect(mockMqttPublish).toHaveBeenCalledWith('wled/test/state/on', 'true');
+    expect(mockMqttPublish).toHaveBeenCalledWith('wled/test/state/seg', '[{"id":0}]');
     expect(mockMqttPublish).toHaveBeenCalledWith('wled/test/info/name', 'Desk');
     expect(mockMqttPublish).toHaveBeenCalledWith('wled/test/effects', '["Solid"]');
     expect(mockMqttPublish).toHaveBeenCalledWith('wled/test/palettes', '["Default"]');
