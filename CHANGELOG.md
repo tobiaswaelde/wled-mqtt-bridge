@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.0.2
+
+### Patch Changes
+
+- [`6ee43c3`](https://github.com/tobiaswaelde/wled-mqtt-bridge/commit/6ee43c3f021f58bc9587a3e0d535c3467799b1a3) Thanks [@tobiaswaelde](https://github.com/tobiaswaelde)! - Publish the complete WLED segment array as JSON to `state/seg`.
+
+- [`4a93b77`](https://github.com/tobiaswaelde/wled-mqtt-bridge/commit/4a93b77d1d07438a19764955ad5c71105f842511) Thanks [@tobiaswaelde](https://github.com/tobiaswaelde)! - Use a static app module import during bootstrap.
+
 ## 3.0.1
 
 ### Patch Changes
