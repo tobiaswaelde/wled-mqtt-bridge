@@ -3,7 +3,7 @@
 # =============================================================================
 
 # Bundle the application in a disposable build stage.
-FROM node:25-bookworm-slim AS build
+FROM node:26-bookworm-slim AS build
 WORKDIR /app
 
 # -----------------------------------------------------------------------------
@@ -31,7 +31,7 @@ RUN pnpm build && rm -f dist/*.map
 # =============================================================================
 
 # Run only the compiled bridge and its example configuration in the final image.
-FROM node:25-bookworm-slim
+FROM node:26-bookworm-slim
 WORKDIR /app
 ENV NODE_ENV=production CONFIG_FILE=/app/config/config.yml
 
