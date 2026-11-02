@@ -3,7 +3,7 @@
 # =============================================================================
 
 # Bundle the application in a disposable build stage.
-FROM node:25-bookworm-slim AS build
+FROM node:26.13.0-bookworm-slim AS build
 WORKDIR /app
 
 # -----------------------------------------------------------------------------
@@ -11,7 +11,7 @@ WORKDIR /app
 # -----------------------------------------------------------------------------
 
 # Keep the package manager version deterministic for local and CI builds.
-RUN npm install --global pnpm@11.24.0
+RUN npm install --global pnpm@11.28.9
 
 # Copy manifests first so dependency installation remains cacheable.
 COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml ./
@@ -31,7 +31,7 @@ RUN pnpm build && rm -f dist/*.map
 # =============================================================================
 
 # Run only the compiled bridge and its example configuration in the final image.
-FROM node:25-bookworm-slim
+FROM node:26.13.0-bookworm-slim
 WORKDIR /app
 ENV NODE_ENV=production CONFIG_FILE=/app/config/config.yml
 
