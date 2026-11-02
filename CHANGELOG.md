@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.0.0
+
+### Major Changes
+
+- [#28](https://github.com/tobiaswaelde/wled-mqtt-bridge/pull/28) [`f43718e`](https://github.com/tobiaswaelde/wled-mqtt-bridge/commit/f43718ed3ddb7763a8197ff3832f1ab4d3c44484) Thanks [@tobiaswaelde](https://github.com/tobiaswaelde)! - Update stable dependencies and security fixes, and move development, CI, and application images to Node.js 26 LTS. Application container runtimes use Node.js 26; published library and VS Code host compatibility is preserved. TypeScript 7 builds use the TypeScript 6 compatibility API for lint and test tooling.
+
 ## 3.0.2
 
 ### Patch Changes
