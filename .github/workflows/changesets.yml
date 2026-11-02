@@ -10,7 +10,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
-        with: { node-version: 24, cache: pnpm }
+        with: { node-version: 26.13.0, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - uses: changesets/action@v2
         with: { version-script: pnpm changeset version }
